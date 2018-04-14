@@ -9,4 +9,3 @@ set hive.query.reexecution.enabled=true;
 set hive.query.reexecution.strategies=overlay;
 
 select assert_true(${hiveconf:zzz} > a) from tx group by a;
-
