@@ -164,6 +164,9 @@ public class QTestUtil {
   private final Set<String> qHashQuerySet;
   private final Set<String> qSortNHashQuerySet;
   private final Set<String> qNoSessionReuseQuerySet;
+  private final Set<String> qMaskStatsQuerySet;
+  private final Set<String> qMaskDataSizeQuerySet;
+  private final Set<String> qMaskLineageQuerySet;
   private final Set<String> qJavaVersionSpecificOutput;
   private static final String SORT_SUFFIX = ".sorted";
   private static Set<String> srcTables;
@@ -590,6 +593,9 @@ public class QTestUtil {
     qHashQuerySet = new HashSet<String>();
     qSortNHashQuerySet = new HashSet<String>();
     qNoSessionReuseQuerySet = new HashSet<String>();
+    qMaskStatsQuerySet = new HashSet<String>();
+    qMaskDataSizeQuerySet = new HashSet<String>();
+    qMaskLineageQuerySet = new HashSet<String>();
     qJavaVersionSpecificOutput = new HashSet<String>();
     this.clusterType = clusterType;
 
@@ -824,6 +830,16 @@ public class QTestUtil {
     if (matches(NO_SESSION_REUSE, query)) {
       qNoSessionReuseQuerySet.add(qf.getName());
     }
+
+    if (matches(MASK_STATS, query)) {
+      qMaskStatsQuerySet.add(qf.getName());
+    }
+    if (matches(MASK_DATA_SIZE, query)) {
+      qMaskDataSizeQuerySet.add(qf.getName());
+    }
+    if (matches(MASK_LINEAGE, query)) {
+      qMaskLineageQuerySet.add(qf.getName());
+    }
   }
 
   private static final Pattern SORT_BEFORE_DIFF = Pattern.compile("-- SORT_BEFORE_DIFF");
@@ -831,6 +847,9 @@ public class QTestUtil {
   private static final Pattern HASH_QUERY_RESULTS = Pattern.compile("-- HASH_QUERY_RESULTS");
   private static final Pattern SORT_AND_HASH_QUERY_RESULTS = Pattern.compile("-- SORT_AND_HASH_QUERY_RESULTS");
   private static final Pattern NO_SESSION_REUSE = Pattern.compile("-- NO_SESSION_REUSE");
+  private static final Pattern MASK_STATS = Pattern.compile("-- MASK_STATS");
+  private static final Pattern MASK_DATA_SIZE = Pattern.compile("-- MASK_DATA_SIZE");
+  private static final Pattern MASK_LINEAGE = Pattern.compile("-- MASK_LINEAGE");
 
   private boolean matches(Pattern pattern, String query) {
     Matcher matcher = pattern.matcher(query);
@@ -1726,7 +1745,8 @@ public class QTestUtil {
 
     File f = new File(logDir, tname + outFileExtension);
 
-    qOutProcessor.maskPatterns(f.getPath());
+    qOutProcessor.maskPatterns(f.getPath(),
+        qMaskStatsQuerySet.contains(tname), qMaskDataSizeQuerySet.contains(tname), qMaskLineageQuerySet.contains(tname));
     QTestProcessExecResult exitVal = executeDiffCommand(f.getPath(),
                                      outFileName, false,
                                      qSortSet.contains(tname));
@@ -1743,9 +1763,11 @@ public class QTestUtil {
   public QTestProcessExecResult checkCompareCliDriverResults(String tname, List<String> outputs)
       throws Exception {
     assert outputs.size() > 1;
-    qOutProcessor.maskPatterns(outputs.get(0));
+    qOutProcessor.maskPatterns(outputs.get(0),
+        qMaskStatsQuerySet.contains(tname), qMaskDataSizeQuerySet.contains(tname), qMaskLineageQuerySet.contains(tname));
     for (int i = 1; i < outputs.size(); ++i) {
-      qOutProcessor.maskPatterns(outputs.get(i));
+      qOutProcessor.maskPatterns(outputs.get(i),
+          qMaskStatsQuerySet.contains(tname), qMaskDataSizeQuerySet.contains(tname), qMaskLineageQuerySet.contains(tname));
       QTestProcessExecResult result = executeDiffCommand(
           outputs.get(i - 1), outputs.get(i), false, qSortSet.contains(tname));
       if (result.getReturnCode() != 0) {
