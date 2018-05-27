@@ -248,8 +248,8 @@ Stripes:
       Entry 1: numHashFunctions: 4 bitCount: 6272 popCount: 182 loadFactor: 0.029 expectedFpp: 7.090246E-7
       Stripe level merge: numHashFunctions: 4 bitCount: 6272 popCount: 1772 loadFactor: 0.2825 expectedFpp: 0.0063713384
     Row group indices for column 9:
-      Entry 0: count: 1000 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 positions: 0,0,0,0,0,0
-      Entry 1: count: 49 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 positions: 0,7,488,0,1538,488
+      Entry 0: count: 1000 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 min UTC: 2013-03-01 01:11:58.703 max UTC: 2013-03-01 01:11:58.703 positions: 0,0,0,0,0,0
+      Entry 1: count: 49 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 min UTC: 2013-03-01 01:11:58.703 max UTC: 2013-03-01 01:11:58.703 positions: 0,7,488,0,1538,488
     Bloom filters for column 9:
       Entry 0: numHashFunctions: 4 bitCount: 6272 popCount: 4 loadFactor: 0.0006 expectedFpp: 1.6543056E-13
       Entry 1: numHashFunctions: 4 bitCount: 6272 popCount: 4 loadFactor: 0.0006 expectedFpp: 1.6543056E-13
@@ -445,8 +445,8 @@ Stripes:
       Entry 1: numHashFunctions: 7 bitCount: 9600 popCount: 317 loadFactor: 0.033 expectedFpp: 4.2807122E-11
       Stripe level merge: numHashFunctions: 7 bitCount: 9600 popCount: 3015 loadFactor: 0.3141 expectedFpp: 3.0137875E-4
     Row group indices for column 9:
-      Entry 0: count: 1000 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 positions: 0,0,0,0,0,0
-      Entry 1: count: 49 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 positions: 0,7,488,0,1538,488
+      Entry 0: count: 1000 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 min UTC: 2013-03-01 01:11:58.703 max UTC: 2013-03-01 01:11:58.703 positions: 0,0,0,0,0,0
+      Entry 1: count: 49 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 min UTC: 2013-03-01 01:11:58.703 max UTC: 2013-03-01 01:11:58.703 positions: 0,7,488,0,1538,488
     Bloom filters for column 9:
       Entry 0: numHashFunctions: 7 bitCount: 9600 popCount: 7 loadFactor: 0.0007 expectedFpp: 1.0959422E-22
       Entry 1: numHashFunctions: 7 bitCount: 9600 popCount: 7 loadFactor: 0.0007 expectedFpp: 1.0959422E-22
@@ -654,8 +654,8 @@ Stripes:
       Entry 1: numHashFunctions: 4 bitCount: 6272 popCount: 182 loadFactor: 0.029 expectedFpp: 7.090246E-7
       Stripe level merge: numHashFunctions: 4 bitCount: 6272 popCount: 1772 loadFactor: 0.2825 expectedFpp: 0.0063713384
     Row group indices for column 9:
-      Entry 0: count: 1000 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 positions: 0,0,0,0,0,0
-      Entry 1: count: 49 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 positions: 0,7,488,0,1538,488
+      Entry 0: count: 1000 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 min UTC: 2013-03-01 01:11:58.703 max UTC: 2013-03-01 01:11:58.703 positions: 0,0,0,0,0,0
+      Entry 1: count: 49 hasNull: false min: 2013-03-01 09:11:58.703 max: 2013-03-01 09:11:58.703 min UTC: 2013-03-01 01:11:58.703 max UTC: 2013-03-01 01:11:58.703 positions: 0,7,488,0,1538,488
     Bloom filters for column 9:
       Entry 0: numHashFunctions: 4 bitCount: 6272 popCount: 4 loadFactor: 0.0006 expectedFpp: 1.6543056E-13
       Entry 1: numHashFunctions: 4 bitCount: 6272 popCount: 4 loadFactor: 0.0006 expectedFpp: 1.6543056E-13
