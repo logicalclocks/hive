@@ -94,6 +94,7 @@ import org.apache.orc.StripeStatistics;
 import org.apache.orc.TypeDescription;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -1656,6 +1657,7 @@ public class TestOrcFile {
     rows.close();
   }
 
+  @Ignore("ORC-367. Will be re-enabled in HIVE-19669")
   @Test
   public void testSeek() throws Exception {
     ObjectInspector inspector;
@@ -1771,6 +1773,7 @@ public class TestOrcFile {
     rows.close();
   }
 
+  @Ignore("ORC-367. Will be re-enabled in HIVE-19669")
   @Test
   public void testZeroCopySeek() throws Exception {
     ObjectInspector inspector;
