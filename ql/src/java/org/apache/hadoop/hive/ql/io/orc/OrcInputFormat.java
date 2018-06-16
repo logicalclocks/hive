@@ -60,6 +60,7 @@ import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedInputFormatInterface;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatchCtx;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedSupport;
 import org.apache.hadoop.hive.ql.io.AcidInputFormat;
 import org.apache.hadoop.hive.ql.io.AcidOutputFormat;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
@@ -158,6 +159,11 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
   InputFormatChecker, VectorizedInputFormatInterface, LlapWrappableInputFormatInterface,
   SelfDescribingInputFormatInterface, AcidInputFormat<NullWritable, OrcStruct>,
   CombineHiveInputFormat.AvoidSplitCombination, BatchToRowInputFormat {
+
+  @Override
+  public VectorizedSupport.Support[] getSupportedFeatures() {
+    return new VectorizedSupport.Support[] {VectorizedSupport.Support.DECIMAL_64};
+  }
 
   static enum SplitStrategyKind {
     HYBRID,
@@ -326,7 +332,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     List<OrcProto.Type> types = OrcUtils.getOrcTypes(schema);
     options.include(genIncludedColumns(schema, conf));
     setSearchArgument(options, types, conf, isOriginal);
-    return file.rowsOptions(options);
+    return file.rowsOptions(options, conf);
   }
 
   public static boolean isOriginal(Reader file) {
