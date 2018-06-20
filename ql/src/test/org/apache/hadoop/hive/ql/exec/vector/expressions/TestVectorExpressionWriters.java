@@ -41,7 +41,7 @@ import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
-import org.apache.hadoop.hive.serde2.io.TimestampWritable;
+import org.apache.hadoop.hive.serde2.io.TimestampWritableV2;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
@@ -84,7 +84,8 @@ public class TestVectorExpressionWriters {
 
 
   private Writable getWritableValue(TypeInfo ti, Timestamp value) {
-    return new TimestampWritable(value);
+    return new TimestampWritableV2(
+        org.apache.hadoop.hive.common.type.Timestamp.ofEpochMilli(value.getTime(), value.getNanos()));
   }
 
   private Writable getWritableValue(TypeInfo ti, HiveDecimal value) {
@@ -116,7 +117,8 @@ public class TestVectorExpressionWriters {
       return new BooleanWritable( value == 0 ? false : true);
     } else if (ti.equals(TypeInfoFactory.timestampTypeInfo)) {
       Timestamp ts = new Timestamp(value);
-      TimestampWritable tw = new TimestampWritable(ts);
+      TimestampWritableV2 tw = new TimestampWritableV2(
+          org.apache.hadoop.hive.common.type.Timestamp.ofEpochMilli(ts.getTime(), ts.getNanos()));
       return tw;
     }
     return null;
@@ -239,8 +241,8 @@ public class TestVectorExpressionWriters {
       Writable w = (Writable) vew.writeValue(tcv, i);
       if (w != null) {
         Writable expected = getWritableValue(type, timestampValues[i]);
-        TimestampWritable t1 = (TimestampWritable) expected;
-        TimestampWritable t2 = (TimestampWritable) w;
+        TimestampWritableV2 t1 = (TimestampWritableV2) expected;
+        TimestampWritableV2 t2 = (TimestampWritableV2) w;
         Assert.assertTrue(t1.equals(t2));
        } else {
         Assert.assertTrue(tcv.isNull[i]);
@@ -263,8 +265,8 @@ public class TestVectorExpressionWriters {
       values[i] = vew.setValue(values[i], tcv, i);
       if (values[i] != null) {
         Writable expected = getWritableValue(type, timestampValues[i]);
-        TimestampWritable t1 = (TimestampWritable) expected;
-        TimestampWritable t2 = (TimestampWritable) values[i];
+        TimestampWritableV2 t1 = (TimestampWritableV2) expected;
+        TimestampWritableV2 t2 = (TimestampWritableV2) values[i];
         Assert.assertTrue(t1.equals(t2));
       } else {
         Assert.assertTrue(tcv.isNull[i]);
