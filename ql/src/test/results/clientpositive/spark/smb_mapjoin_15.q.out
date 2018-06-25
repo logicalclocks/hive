@@ -54,7 +54,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
-                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  filterExpr: key is not null (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
                     isSamplingPred: false
@@ -367,7 +368,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
-                  Statistics: Num rows: 500 Data size: 7218 Basic stats: COMPLETE Column stats: NONE
+                  filterExpr: (key is not null and key2 is not null) (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
                     isSamplingPred: false
@@ -628,7 +630,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
-                  Statistics: Num rows: 500 Data size: 7218 Basic stats: COMPLETE Column stats: NONE
+                  filterExpr: (key2 is not null and key is not null) (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
                     isSamplingPred: false
@@ -889,7 +892,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: a
-                  Statistics: Num rows: 500 Data size: 7218 Basic stats: COMPLETE Column stats: NONE
+                  filterExpr: (key is not null and value is not null) (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
                     isSamplingPred: false
@@ -970,7 +974,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: b
-                  Statistics: Num rows: 500 Data size: 7218 Basic stats: COMPLETE Column stats: NONE
+                  filterExpr: (key is not null and value is not null) (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: NONE
                   GatherStats: false
                   Filter Operator
                     isSamplingPred: false
