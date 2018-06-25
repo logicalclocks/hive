@@ -427,7 +427,8 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: srcpart
-            Statistics: Num rows: 198 Data size: 116240 Basic stats: COMPLETE Column stats: NONE
+            filterExpr: (ds = '2008-04-08') (type: boolean)
+            Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
             Select Operator
               expressions: key (type: string)
               outputColumnNames: key

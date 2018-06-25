@@ -216,7 +216,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t1
-                  Statistics: Num rows: 130 Data size: 520 Basic stats: COMPLETE Column stats: COMPLETE
+                  filterExpr: userid is not null (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
                     predicate: userid is not null (type: boolean)
                     Statistics: Num rows: 130 Data size: 520 Basic stats: COMPLETE Column stats: COMPLETE
@@ -235,7 +236,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: fa
-                  Statistics: Num rows: 527 Data size: 2108 Basic stats: COMPLETE Column stats: COMPLETE
+                  filterExpr: userid is not null (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
                     predicate: userid is not null (type: boolean)
                     Statistics: Num rows: 527 Data size: 2108 Basic stats: COMPLETE Column stats: COMPLETE
@@ -335,7 +337,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: t1
-                  Statistics: Num rows: 130 Data size: 520 Basic stats: COMPLETE Column stats: COMPLETE
+                  filterExpr: userid is not null (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
                     predicate: userid is not null (type: boolean)
                     Statistics: Num rows: 130 Data size: 520 Basic stats: COMPLETE Column stats: COMPLETE
@@ -346,7 +349,8 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: fa
-                  Statistics: Num rows: 527 Data size: 2108 Basic stats: COMPLETE Column stats: COMPLETE
+                  filterExpr: userid is not null (type: boolean)
+                  Statistics: Num rows: ###Masked### Data size: ###Masked### Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
                     predicate: userid is not null (type: boolean)
                     Statistics: Num rows: 527 Data size: 2108 Basic stats: COMPLETE Column stats: COMPLETE
