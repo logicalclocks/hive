@@ -18,7 +18,7 @@
 package org.apache.hadoop.hive.ql.parse;
 
 import org.antlr.runtime.tree.Tree;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -60,6 +60,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVEQUERYID;
+import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.REPL_DUMP_METADATA_ONLY;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_DBNAME;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_LIMIT;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_REPL_CONFIG;
@@ -223,20 +225,7 @@ public class ReplicationSemanticAnalyzer extends BaseSemanticAnalyzer {
           tblNameOrPattern = PlanUtils.stripQuotes(childNode.getChild(0).getText());
           break;
         case TOK_REPL_CONFIG:
-          Map<String, String> replConfigs
-                  = DDLSemanticAnalyzer.getProps((ASTNode) childNode.getChild(0));
-          if (null != replConfigs) {
-            for (Map.Entry<String, String> config : replConfigs.entrySet()) {
-              conf.set(config.getKey(), config.getValue());
-            }
-
-            // As hive conf is changed, need to get the Hive DB again with it.
-            try {
-              db = Hive.get(conf);
-            } catch (HiveException e) {
-              throw new SemanticException(e);
-            }
-          }
+          setConfigs((ASTNode) childNode.getChild(0));
           break;
         default:
           throw new SemanticException("Unrecognized token in REPL LOAD statement");
@@ -579,10 +568,10 @@ public class ReplicationSemanticAnalyzer extends BaseSemanticAnalyzer {
     Task<? extends Serializable> barrierTask = TaskFactory.get(new DependencyCollectionWork());
 
     // Link import tasks to the barrier task which will in-turn linked with repl state update tasks
-    for (Task<? extends Serializable> t : importTasks){
+    for (Task<? extends Serializable> t : importTasks) {
       t.addDependentTask(barrierTask);
       LOG.debug("Added {}:{} as a precursor of barrier task {}:{}",
-              t.getClass(), t.getId(), barrierTask.getClass(), barrierTask.getId());
+          t.getClass(), t.getId(), barrierTask.getClass(), barrierTask.getId());
     }
 
     List<Task<? extends Serializable>> tasks = new ArrayList<>();
@@ -611,6 +600,32 @@ public class ReplicationSemanticAnalyzer extends BaseSemanticAnalyzer {
     return tasks;
   }
 
+  private void setConfigs(ASTNode node) throws SemanticException {
+    Map<String, String> replConfigs = DDLSemanticAnalyzer.getProps(node);
+    if (null != replConfigs) {
+      for (Map.Entry<String, String> config : replConfigs.entrySet()) {
+        String key = config.getKey();
+        // don't set the query id in the config
+        if (key.equalsIgnoreCase(HIVEQUERYID.varname)) {
+          String queryTag = config.getValue();
+          if (!StringUtils.isEmpty(queryTag)) {
+            QueryState.setMapReduceJobTag(conf, queryTag);
+          }
+          queryState.setQueryTag(queryTag);
+        } else {
+          conf.set(key, config.getValue());
+        }
+      }
+
+      // As hive conf is changed, need to get the Hive DB again with it.
+      try {
+        db = Hive.get(conf);
+      } catch (HiveException e) {
+        throw new SemanticException(e);
+      }
+    }
+  }
+
   // REPL STATUS
   private void initReplStatus(ASTNode ast) throws SemanticException{
     dbNameOrPattern = PlanUtils.stripQuotes(ast.getChild(0).getText());
@@ -622,20 +637,7 @@ public class ReplicationSemanticAnalyzer extends BaseSemanticAnalyzer {
         tblNameOrPattern = PlanUtils.stripQuotes(childNode.getChild(0).getText());
         break;
       case TOK_REPL_CONFIG:
-        Map<String, String> replConfigs
-            = DDLSemanticAnalyzer.getProps((ASTNode) childNode.getChild(0));
-        if (null != replConfigs) {
-          for (Map.Entry<String, String> config : replConfigs.entrySet()) {
-            conf.set(config.getKey(), config.getValue());
-          }
-
-          // As hive conf is changed, need to get the Hive DB again with it.
-          try {
-            db = Hive.get(conf);
-          } catch (HiveException e) {
-            throw new SemanticException(e);
-          }
-        }
+        setConfigs((ASTNode) childNode.getChild(0));
         break;
       default:
         throw new SemanticException("Unrecognized token in REPL STATUS statement");
