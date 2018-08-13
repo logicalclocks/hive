@@ -105,8 +105,9 @@ public class TestJdbcWithMiniLlap {
   private static HiveConf conf = null;
   private Connection hs2Conn = null;
 
-  @BeforeClass
-  public static void beforeTest() throws Exception {
+  // This method should be called by sub-classes in a @BeforeClass initializer
+  public static MiniHS2 beforeTest(HiveConf inputConf) throws Exception {
+    conf = inputConf;
     Class.forName(MiniHS2.getJdbcDriverName());
 
     String confDir = "../../data/conf/llap/";
@@ -130,6 +131,7 @@ public class TestJdbcWithMiniLlap {
     Map<String, String> confOverlay = new HashMap<String, String>();
     miniHS2.start(confOverlay);
     miniHS2.getDFS().getFileSystem().mkdirs(new Path("/apps_staging_dir/anonymous"));
+    return miniHS2;
   }
 
   @Before
