@@ -70,6 +70,7 @@ import org.apache.hadoop.hive.cli.CliSessionState;
 import org.apache.hadoop.hive.cli.control.AbstractCliConfig;
 import org.apache.hadoop.hive.common.io.CachingPrintStream;
 import org.apache.hadoop.hive.common.io.DigestPrintStream;
+import org.apache.hadoop.hive.common.io.SessionStream;
 import org.apache.hadoop.hive.common.io.SortAndDigestPrintStream;
 import org.apache.hadoop.hive.common.io.SortPrintStream;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -1347,7 +1348,7 @@ public class QTestUtil {
     } else if (qSortNHashQuerySet.contains(fileName)) {
       ss.out = new SortAndDigestPrintStream(fo, "UTF-8");
     } else {
-      ss.out = new PrintStream(fo, true, "UTF-8");
+      ss.out = new SessionStream(fo, true, "UTF-8");
     }
     ss.err = new CachingPrintStream(fo, true, "UTF-8");
     ss.setIsSilent(true);
@@ -1382,8 +1383,8 @@ public class QTestUtil {
     CliSessionState ss = new CliSessionState(conf);
     assert ss != null;
     ss.in = System.in;
-    ss.out = System.out;
-    ss.err = System.out;
+    ss.out = new SessionStream(System.out);
+    ss.err = new SessionStream(System.out);
 
     SessionState oldSs = SessionState.get();
 
