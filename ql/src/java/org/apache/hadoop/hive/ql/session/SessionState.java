@@ -53,6 +53,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.common.io.SessionStream;
 import org.apache.hadoop.hive.common.log.ProgressMonitor;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
@@ -170,9 +171,9 @@ public class SessionState {
    * Streams to read/write from.
    */
   public InputStream in;
-  public PrintStream out;
-  public PrintStream info;
-  public PrintStream err;
+  public SessionStream out;
+  public SessionStream info;
+  public SessionStream err;
   /**
    * Standard output from any child process(es).
    */
