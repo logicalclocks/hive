@@ -109,9 +109,10 @@ public class Warehouse {
    */
   public static FileSystem getFs(Path f, Configuration conf) throws MetaException {
     try {
-      //TODO: tell hdfs client where the certificates are
-
-      return f.getFileSystem(conf);
+      // Hops changes the configuration object and adds the TLS configuration settings
+      // Conf is a shared object for all the clients. That's why we need to clone it
+      // before calling the getFileSystem.
+      return f.getFileSystem(new Configuration(conf));
     } catch (IOException e) {
       MetaStoreUtils.logAndThrowMetaException(e);
     }
@@ -650,7 +651,10 @@ public class Warehouse {
       throws MetaException {
     try {
       Path path = new Path(location);
-      FileSystem fileSys = path.getFileSystem(conf);
+      // Hops changes the configuration object and adds the TLS configuration settings
+      // Conf is a shared object for all the clients. That's why we need to clone it
+      // before calling the getFileSystem.
+      FileSystem fileSys = path.getFileSystem(new Configuration(conf));
       return FileUtils.getFileStatusRecurse(path, -1, fileSys);
     } catch (IOException ioe) {
       MetaStoreUtils.logAndThrowMetaException(ioe);
@@ -668,7 +672,10 @@ public class Warehouse {
       throws MetaException {
     Path tablePath = getDnsPath(new Path(table.getSd().getLocation()));
     try {
-      FileSystem fileSys = tablePath.getFileSystem(conf);
+      // Hops changes the configuration object and adds the TLS configuration settings
+      // Conf is a shared object for all the clients. That's why we need to clone it
+      // before calling the getFileSystem.
+      FileSystem fileSys = tablePath.getFileSystem(new Configuration(conf));
       return FileUtils.getFileStatusRecurse(tablePath, -1, fileSys);
     } catch (IOException ioe) {
       MetaStoreUtils.logAndThrowMetaException(ioe);
