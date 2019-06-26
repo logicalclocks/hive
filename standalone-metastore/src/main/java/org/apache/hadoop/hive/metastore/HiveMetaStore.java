@@ -6858,17 +6858,19 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       try {
         String username = UserGroupInformation.getCurrentUser().getUserName();
         String applicationId = UserGroupInformation.getCurrentUser().getApplicationId();
-        try {
-          certLocService.getX509MaterialLocation(username, applicationId);
-          // no exception is thrown, this means that the certificate has been found in the
-          // CertificateMaterializerService. This means the user is updating their certificate
-          certLocService.updateX509(username, applicationId, keyStore, keyStorePassword, trustStore, trustStorePassword);
-        } catch (FileNotFoundException e) {
-          // The exception is thrown if no certificates are present in the CertificateMaterializerService
-          // This means the client has just opened a connection and it's sending the certificate
-          certLocService.materializeCertificates(username, applicationId, username, keyStore, keyStorePassword,
+
+        certLocService.materializeCertificates(username, applicationId, username, keyStore, keyStorePassword,
             trustStore, trustStorePassword);
-        }
+        //try {
+        //  certLocService.getX509MaterialLocation(username, applicationId);
+        //  // no exception is thrown, this means that the certificate has been found in the
+        //  // CertificateMaterializerService. This means the user is updating their certificate
+        //  certLocService.updateX509(username, applicationId, keyStore, keyStorePassword, trustStore, trustStorePassword);
+        //} catch (FileNotFoundException e) {
+        //  // The exception is thrown if no certificates are present in the CertificateMaterializerService
+        //  // This means the client has just opened a connection and it's sending the certificate
+        //
+        //}
       } catch (IOException | InterruptedException e) {
         throw new MetaException(e.getMessage());
       }

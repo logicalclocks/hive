@@ -133,17 +133,14 @@ public class TestTLSHiveMetastoreClient {
 
     CertificateLocalization certificateLocalization =
         CertificateLocalizationCtx.getInstance().getCertificateLocalization();
-    // Assert is 1 as Hive metastore will update the certificate stored in the certificateLocalization service,
-    // which is one per jvm (shared by HM and tests)
-    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    // CertLocService shared with tests
+    Assert.assertEquals(2, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
 
     hmsc.close();
     hmsc = null;
     Thread.sleep(1000);
 
-    // The certificate should have been removed
-    rule.expect(FileNotFoundException.class);
-    certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications();
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
   }
 
   @Test
@@ -175,8 +172,10 @@ public class TestTLSHiveMetastoreClient {
 
     CertificateLocalization certificateLocalization =
         CertificateLocalizationCtx.getInstance().getCertificateLocalization();
-    // Expect only one here as it should have been saved
+
+    // CertLocService shared with the tests.
     Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+
     // Expect one certificate saved under the `clientUsername,app`
     Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername,
         "app").getRequestedApplications());
@@ -194,7 +193,6 @@ public class TestTLSHiveMetastoreClient {
 
   @Test
   public void testConcurrentAppNonAppUser() throws Exception {
-
     UserGroupInformation ugiApp =
         UserGroupInformation.createProxyUser(clientUsername, UserGroupInformation.getCurrentUser());
     ugiApp.addApplicationId("app");
@@ -221,8 +219,9 @@ public class TestTLSHiveMetastoreClient {
       return null;
     });
 
-    // Expect only one here as it should have been saved
-    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    // CertLocService shared with the tests
+    Assert.assertEquals(2, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+
     // Expect one certificate saved under the `clientUsername,app`
     Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername,
         "app").getRequestedApplications());
@@ -236,8 +235,49 @@ public class TestTLSHiveMetastoreClient {
     rule.expect(FileNotFoundException.class);
     certificateLocalization.getX509MaterialLocation(clientUsername, "app");
     // Check that the certificate has been removed correctly
-    rule.expect(FileNotFoundException.class);
-    certificateLocalization.getX509MaterialLocation(clientUsername);
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    cleanCertificateLocalization(clientUsername, null);
+  }
+
+  @Test
+  public void testConcurrentUsers() throws Exception {
+    UserGroupInformation ugiUser =
+        UserGroupInformation.createProxyUser(clientUsername, UserGroupInformation.getCurrentUser());
+    setUpCertificateLocalization(clientUsername, clientKeyStore, clientTrustStore);
+
+    ugiUser.doAs((PrivilegedExceptionAction<Object>) () -> {
+      hmsc = new HiveMetaStoreClient(hiveConf);
+      return null;
+    });
+
+    ugiUser.doAs((PrivilegedExceptionAction<Object>) () -> {
+      hmscUser = new HiveMetaStoreClient(hiveConf);
+      return null;
+    });
+
+    // Expect only one here as it should have been saved
+    CertificateLocalization certificateLocalization = CertificateLocalizationCtx
+        .getInstance().getCertificateLocalization();
+    Assert.assertEquals(3, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+
+    hmsc.close();
+    hmsc = null;
+    Thread.sleep(1000);
+
+    Assert.assertEquals(2, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+
+    hmscUser.close();
+    hmscUser = null;
+
+    Thread.sleep(1000);
+
+    // Check that the certificate has been removed correctly - left one loaded by the tests.
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+  }
+
+  @Test
+  public void testAppCertificateRotation() throws Exception {
+    // TODO(Fabio)
   }
 
   @Test
