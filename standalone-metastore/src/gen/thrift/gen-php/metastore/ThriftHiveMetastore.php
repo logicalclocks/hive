@@ -1079,9 +1079,10 @@ interface ThriftHiveMetastoreIf extends \FacebookServiceIf {
    * @param string $key_store_password
    * @param string $trust_store
    * @param string $trust_store_password
+   * @param bool $update
    * @throws \metastore\MetaException
    */
-  public function set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password);
+  public function set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password, $update);
   /**
    * @param string $token_owner
    * @param string $renewer_kerberos_principal_name
@@ -9045,19 +9046,20 @@ class ThriftHiveMetastoreClient extends \FacebookServiceClient implements \metas
     throw new \Exception("set_ugi failed: unknown result");
   }
 
-  public function set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password)
+  public function set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password, $update)
   {
-    $this->send_set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password);
+    $this->send_set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password, $update);
     $this->recv_set_crypto();
   }
 
-  public function send_set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password)
+  public function send_set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password, $update)
   {
     $args = new \metastore\ThriftHiveMetastore_set_crypto_args();
     $args->key_store = $key_store;
     $args->key_store_password = $key_store_password;
     $args->trust_store = $trust_store;
     $args->trust_store_password = $trust_store_password;
+    $args->update = $update;
     $bin_accel = ($this->output_ instanceof TBinaryProtocolAccelerated) && function_exists('thrift_protocol_write_binary');
     if ($bin_accel)
     {
@@ -45049,6 +45051,10 @@ class ThriftHiveMetastore_set_crypto_args {
    * @var string
    */
   public $trust_store_password = null;
+  /**
+   * @var bool
+   */
+  public $update = null;
 
   public function __construct($vals=null) {
     if (!isset(self::$_TSPEC)) {
@@ -45069,6 +45075,10 @@ class ThriftHiveMetastore_set_crypto_args {
           'var' => 'trust_store_password',
           'type' => TType::STRING,
           ),
+        5 => array(
+          'var' => 'update',
+          'type' => TType::BOOL,
+          ),
         );
     }
     if (is_array($vals)) {
@@ -45083,6 +45093,9 @@ class ThriftHiveMetastore_set_crypto_args {
       }
       if (isset($vals['trust_store_password'])) {
         $this->trust_store_password = $vals['trust_store_password'];
+      }
+      if (isset($vals['update'])) {
+        $this->update = $vals['update'];
       }
     }
   }
@@ -45134,6 +45147,13 @@ class ThriftHiveMetastore_set_crypto_args {
             $xfer += $input->skip($ftype);
           }
           break;
+        case 5:
+          if ($ftype == TType::BOOL) {
+            $xfer += $input->readBool($this->update);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
         default:
           $xfer += $input->skip($ftype);
           break;
@@ -45165,6 +45185,11 @@ class ThriftHiveMetastore_set_crypto_args {
     if ($this->trust_store_password !== null) {
       $xfer += $output->writeFieldBegin('trust_store_password', TType::STRING, 4);
       $xfer += $output->writeString($this->trust_store_password);
+      $xfer += $output->writeFieldEnd();
+    }
+    if ($this->update !== null) {
+      $xfer += $output->writeFieldBegin('update', TType::BOOL, 5);
+      $xfer += $output->writeBool($this->update);
       $xfer += $output->writeFieldEnd();
     }
     $xfer += $output->writeFieldStop();

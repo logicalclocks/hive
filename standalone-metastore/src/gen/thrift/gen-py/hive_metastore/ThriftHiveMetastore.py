@@ -1077,13 +1077,14 @@ class Iface(fb303.FacebookService.Iface):
     """
     pass
 
-  def set_crypto(self, key_store, key_store_password, trust_store, trust_store_password):
+  def set_crypto(self, key_store, key_store_password, trust_store, trust_store_password, update):
     """
     Parameters:
      - key_store
      - key_store_password
      - trust_store
      - trust_store_password
+     - update
     """
     pass
 
@@ -6418,24 +6419,26 @@ class Client(fb303.FacebookService.Client, Iface):
       raise result.o1
     raise TApplicationException(TApplicationException.MISSING_RESULT, "set_ugi failed: unknown result")
 
-  def set_crypto(self, key_store, key_store_password, trust_store, trust_store_password):
+  def set_crypto(self, key_store, key_store_password, trust_store, trust_store_password, update):
     """
     Parameters:
      - key_store
      - key_store_password
      - trust_store
      - trust_store_password
+     - update
     """
-    self.send_set_crypto(key_store, key_store_password, trust_store, trust_store_password)
+    self.send_set_crypto(key_store, key_store_password, trust_store, trust_store_password, update)
     self.recv_set_crypto()
 
-  def send_set_crypto(self, key_store, key_store_password, trust_store, trust_store_password):
+  def send_set_crypto(self, key_store, key_store_password, trust_store, trust_store_password, update):
     self._oprot.writeMessageBegin('set_crypto', TMessageType.CALL, self._seqid)
     args = set_crypto_args()
     args.key_store = key_store
     args.key_store_password = key_store_password
     args.trust_store = trust_store
     args.trust_store_password = trust_store_password
+    args.update = update
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
     self._oprot.trans.flush()
@@ -12521,7 +12524,7 @@ class Processor(fb303.FacebookService.Processor, Iface, TProcessor):
     iprot.readMessageEnd()
     result = set_crypto_result()
     try:
-      self._handler.set_crypto(args.key_store, args.key_store_password, args.trust_store, args.trust_store_password)
+      self._handler.set_crypto(args.key_store, args.key_store_password, args.trust_store, args.trust_store_password, args.update)
       msg_type = TMessageType.REPLY
     except (TTransport.TTransportException, KeyboardInterrupt, SystemExit):
       raise
@@ -37282,6 +37285,7 @@ class set_crypto_args:
    - key_store_password
    - trust_store
    - trust_store_password
+   - update
   """
 
   thrift_spec = (
@@ -37290,13 +37294,15 @@ class set_crypto_args:
     (2, TType.STRING, 'key_store_password', None, None, ), # 2
     (3, TType.STRING, 'trust_store', None, None, ), # 3
     (4, TType.STRING, 'trust_store_password', None, None, ), # 4
+    (5, TType.BOOL, 'update', None, None, ), # 5
   )
 
-  def __init__(self, key_store=None, key_store_password=None, trust_store=None, trust_store_password=None,):
+  def __init__(self, key_store=None, key_store_password=None, trust_store=None, trust_store_password=None, update=None,):
     self.key_store = key_store
     self.key_store_password = key_store_password
     self.trust_store = trust_store
     self.trust_store_password = trust_store_password
+    self.update = update
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -37327,6 +37333,11 @@ class set_crypto_args:
           self.trust_store_password = iprot.readString()
         else:
           iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.BOOL:
+          self.update = iprot.readBool()
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -37353,6 +37364,10 @@ class set_crypto_args:
       oprot.writeFieldBegin('trust_store_password', TType.STRING, 4)
       oprot.writeString(self.trust_store_password)
       oprot.writeFieldEnd()
+    if self.update is not None:
+      oprot.writeFieldBegin('update', TType.BOOL, 5)
+      oprot.writeBool(self.update)
+      oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
 
@@ -37366,6 +37381,7 @@ class set_crypto_args:
     value = (value * 31) ^ hash(self.key_store_password)
     value = (value * 31) ^ hash(self.trust_store)
     value = (value * 31) ^ hash(self.trust_store_password)
+    value = (value * 31) ^ hash(self.update)
     return value
 
   def __repr__(self):

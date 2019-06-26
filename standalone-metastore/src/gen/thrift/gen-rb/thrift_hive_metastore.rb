@@ -2193,13 +2193,13 @@ module ThriftHiveMetastore
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'set_ugi failed: unknown result')
     end
 
-    def set_crypto(key_store, key_store_password, trust_store, trust_store_password)
-      send_set_crypto(key_store, key_store_password, trust_store, trust_store_password)
+    def set_crypto(key_store, key_store_password, trust_store, trust_store_password, update)
+      send_set_crypto(key_store, key_store_password, trust_store, trust_store_password, update)
       recv_set_crypto()
     end
 
-    def send_set_crypto(key_store, key_store_password, trust_store, trust_store_password)
-      send_message('set_crypto', Set_crypto_args, :key_store => key_store, :key_store_password => key_store_password, :trust_store => trust_store, :trust_store_password => trust_store_password)
+    def send_set_crypto(key_store, key_store_password, trust_store, trust_store_password, update)
+      send_message('set_crypto', Set_crypto_args, :key_store => key_store, :key_store_password => key_store_password, :trust_store => trust_store, :trust_store_password => trust_store_password, :update => update)
     end
 
     def recv_set_crypto()
@@ -5178,7 +5178,7 @@ module ThriftHiveMetastore
       args = read_args(iprot, Set_crypto_args)
       result = Set_crypto_result.new()
       begin
-        @handler.set_crypto(args.key_store, args.key_store_password, args.trust_store, args.trust_store_password)
+        @handler.set_crypto(args.key_store, args.key_store_password, args.trust_store, args.trust_store_password, args.update)
       rescue ::MetaException => o1
         result.o1 = o1
       end
@@ -11027,12 +11027,14 @@ module ThriftHiveMetastore
     KEY_STORE_PASSWORD = 2
     TRUST_STORE = 3
     TRUST_STORE_PASSWORD = 4
+    UPDATE = 5
 
     FIELDS = {
       KEY_STORE => {:type => ::Thrift::Types::STRING, :name => 'key_store', :binary => true},
       KEY_STORE_PASSWORD => {:type => ::Thrift::Types::STRING, :name => 'key_store_password'},
       TRUST_STORE => {:type => ::Thrift::Types::STRING, :name => 'trust_store', :binary => true},
-      TRUST_STORE_PASSWORD => {:type => ::Thrift::Types::STRING, :name => 'trust_store_password'}
+      TRUST_STORE_PASSWORD => {:type => ::Thrift::Types::STRING, :name => 'trust_store_password'},
+      UPDATE => {:type => ::Thrift::Types::BOOL, :name => 'update'}
     }
 
     def struct_fields; FIELDS; end

@@ -33788,6 +33788,14 @@ uint32_t ThriftHiveMetastore_set_crypto_args::read(::apache::thrift::protocol::T
           xfer += iprot->skip(ftype);
         }
         break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->update);
+          this->__isset.update = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -33821,6 +33829,10 @@ uint32_t ThriftHiveMetastore_set_crypto_args::write(::apache::thrift::protocol::
   xfer += oprot->writeString(this->trust_store_password);
   xfer += oprot->writeFieldEnd();
 
+  xfer += oprot->writeFieldBegin("update", ::apache::thrift::protocol::T_BOOL, 5);
+  xfer += oprot->writeBool(this->update);
+  xfer += oprot->writeFieldEnd();
+
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -33850,6 +33862,10 @@ uint32_t ThriftHiveMetastore_set_crypto_pargs::write(::apache::thrift::protocol:
 
   xfer += oprot->writeFieldBegin("trust_store_password", ::apache::thrift::protocol::T_STRING, 4);
   xfer += oprot->writeString((*(this->trust_store_password)));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("update", ::apache::thrift::protocol::T_BOOL, 5);
+  xfer += oprot->writeBool((*(this->update)));
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
@@ -58563,13 +58579,13 @@ void ThriftHiveMetastoreClient::recv_set_ugi(std::vector<std::string> & _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "set_ugi failed: unknown result");
 }
 
-void ThriftHiveMetastoreClient::set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password)
+void ThriftHiveMetastoreClient::set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password, const bool update)
 {
-  send_set_crypto(key_store, key_store_password, trust_store, trust_store_password);
+  send_set_crypto(key_store, key_store_password, trust_store, trust_store_password, update);
   recv_set_crypto();
 }
 
-void ThriftHiveMetastoreClient::send_set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password)
+void ThriftHiveMetastoreClient::send_set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password, const bool update)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("set_crypto", ::apache::thrift::protocol::T_CALL, cseqid);
@@ -58579,6 +58595,7 @@ void ThriftHiveMetastoreClient::send_set_crypto(const std::string& key_store, co
   args.key_store_password = &key_store_password;
   args.trust_store = &trust_store;
   args.trust_store_password = &trust_store_password;
+  args.update = &update;
   args.write(oprot_);
 
   oprot_->writeMessageEnd();
@@ -71122,7 +71139,7 @@ void ThriftHiveMetastoreProcessor::process_set_crypto(int32_t seqid, ::apache::t
 
   ThriftHiveMetastore_set_crypto_result result;
   try {
-    iface_->set_crypto(args.key_store, args.key_store_password, args.trust_store, args.trust_store_password);
+    iface_->set_crypto(args.key_store, args.key_store_password, args.trust_store, args.trust_store_password, args.update);
   } catch (MetaException &o1) {
     result.o1 = o1;
     result.__isset.o1 = true;
@@ -87552,13 +87569,13 @@ void ThriftHiveMetastoreConcurrentClient::recv_set_ugi(std::vector<std::string> 
   } // end while(true)
 }
 
-void ThriftHiveMetastoreConcurrentClient::set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password)
+void ThriftHiveMetastoreConcurrentClient::set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password, const bool update)
 {
-  int32_t seqid = send_set_crypto(key_store, key_store_password, trust_store, trust_store_password);
+  int32_t seqid = send_set_crypto(key_store, key_store_password, trust_store, trust_store_password, update);
   recv_set_crypto(seqid);
 }
 
-int32_t ThriftHiveMetastoreConcurrentClient::send_set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password)
+int32_t ThriftHiveMetastoreConcurrentClient::send_set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password, const bool update)
 {
   int32_t cseqid = this->sync_.generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(&this->sync_);
@@ -87569,6 +87586,7 @@ int32_t ThriftHiveMetastoreConcurrentClient::send_set_crypto(const std::string& 
   args.key_store_password = &key_store_password;
   args.trust_store = &trust_store;
   args.trust_store_password = &trust_store_password;
+  args.update = &update;
   args.write(oprot_);
 
   oprot_->writeMessageEnd();

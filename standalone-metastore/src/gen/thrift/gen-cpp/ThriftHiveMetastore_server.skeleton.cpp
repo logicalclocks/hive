@@ -667,7 +667,7 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("set_ugi\n");
   }
 
-  void set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password) {
+  void set_crypto(const std::string& key_store, const std::string& key_store_password, const std::string& trust_store, const std::string& trust_store_password, const bool update) {
     // Your implementation goes here
     printf("set_crypto\n");
   }

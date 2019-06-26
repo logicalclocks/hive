@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hive.metastore;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
@@ -255,16 +256,18 @@ public class TestTLSHiveMetastoreClient {
       return null;
     });
 
-    // Expect only one here as it should have been saved
+    // Shared between server and tests
     CertificateLocalization certificateLocalization = CertificateLocalizationCtx
         .getInstance().getCertificateLocalization();
-    Assert.assertEquals(3, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    Assert.assertEquals(3,
+        certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
 
     hmsc.close();
     hmsc = null;
     Thread.sleep(1000);
 
-    Assert.assertEquals(2, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    Assert.assertEquals(2,
+        certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
 
     hmscUser.close();
     hmscUser = null;
@@ -272,12 +275,39 @@ public class TestTLSHiveMetastoreClient {
     Thread.sleep(1000);
 
     // Check that the certificate has been removed correctly - left one loaded by the tests.
-    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    Assert.assertEquals(1,
+        certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
   }
 
   @Test
   public void testAppCertificateRotation() throws Exception {
-    // TODO(Fabio)
+    UserGroupInformation ugiUser = UserGroupInformation.createProxyUser(clientUsername,
+        UserGroupInformation.getCurrentUser());
+
+    FileUtils.copyFile(appClientKeyStore.toFile(), Paths.get("k_certificate").toFile());
+    FileUtils.copyFile(appClientTrustStore.toFile(), Paths.get("t_certificate").toFile());
+    FileUtils.write(Paths.get("material_passwd").toFile(), password);
+
+    ugiUser.doAs((PrivilegedExceptionAction<Object>) () -> {
+      hmsc = new HiveMetaStoreClient(hiveConf);
+      return null;
+    });
+
+    Thread.sleep(10000);
+
+    CertificateLocalization certificateLocalization = CertificateLocalizationCtx
+        .getInstance().getCertificateLocalization();
+    Assert.assertEquals(1,
+        certificateLocalization.getX509MaterialLocation(clientUsername, "app").getRequestedApplications());
+
+    hmsc.close();
+    hmsc = null;
+
+    FileUtils.deleteQuietly(Paths.get("k_certificate").toFile());
+    FileUtils.deleteQuietly(Paths.get("t_certificate").toFile());
+    FileUtils.deleteQuietly(Paths.get("material_passwd").toFile());
+
+    cleanCertificateLocalization(clientUsername, "app");
   }
 
   @Test

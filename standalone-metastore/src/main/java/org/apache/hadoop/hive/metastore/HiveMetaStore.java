@@ -6847,7 +6847,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
 
     @Override
     public void set_crypto(ByteBuffer keyStore, String keyStorePassword,
-                           ByteBuffer trustStore, String trustStorePassword) throws MetaException {
+                           ByteBuffer trustStore, String trustStorePassword, boolean update) throws MetaException {
       if (keyStore == null || trustStore == null ||
           keyStorePassword == null || keyStorePassword.isEmpty() ||
           trustStorePassword == null || trustStorePassword.isEmpty()) {
@@ -6859,18 +6859,14 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         String username = UserGroupInformation.getCurrentUser().getUserName();
         String applicationId = UserGroupInformation.getCurrentUser().getApplicationId();
 
-        certLocService.materializeCertificates(username, applicationId, username, keyStore, keyStorePassword,
-            trustStore, trustStorePassword);
-        //try {
-        //  certLocService.getX509MaterialLocation(username, applicationId);
-        //  // no exception is thrown, this means that the certificate has been found in the
-        //  // CertificateMaterializerService. This means the user is updating their certificate
-        //  certLocService.updateX509(username, applicationId, keyStore, keyStorePassword, trustStore, trustStorePassword);
-        //} catch (FileNotFoundException e) {
-        //  // The exception is thrown if no certificates are present in the CertificateMaterializerService
-        //  // This means the client has just opened a connection and it's sending the certificate
-        //
-        //}
+        if (update) {
+          // Update the certificate for this app
+          certLocService.updateX509(username, applicationId, keyStore, keyStorePassword, trustStore, trustStorePassword);
+        } else {
+          // Materialize the certificate or bump the counter
+          certLocService.materializeCertificates(username, applicationId, username, keyStore, keyStorePassword,
+              trustStore, trustStorePassword);
+        }
       } catch (IOException | InterruptedException e) {
         throw new MetaException(e.getMessage());
       }

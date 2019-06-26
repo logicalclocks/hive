@@ -2064,7 +2064,7 @@ service ThriftHiveMetastore extends fb303.FacebookService
 
   // When HopsTLS is enabled, this function is used to send the certificate to the metastore to do FS operations
   void set_crypto(1: binary key_store, 2: string key_store_password,
-                  3: binary trust_store, 4: string trust_store_password) throws (1:MetaException o1)
+                  3: binary trust_store, 4: string trust_store_password, 5: bool update) throws (1:MetaException o1)
 
   //Authentication (delegation token) interfaces
 
