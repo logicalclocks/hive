@@ -6857,15 +6857,16 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       // This call happens inside a doAs.
       try {
         String username = UserGroupInformation.getCurrentUser().getUserName();
+        String applicationId = UserGroupInformation.getCurrentUser().getApplicationId();
         try {
-          certLocService.getX509MaterialLocation(username, username);
+          certLocService.getX509MaterialLocation(username, applicationId);
           // no exception is thrown, this means that the certificate has been found in the
           // CertificateMaterializerService. This means the user is updating their certificate
-          certLocService.updateX509(username, username, keyStore, keyStorePassword, trustStore, trustStorePassword);
+          certLocService.updateX509(username, applicationId, keyStore, keyStorePassword, trustStore, trustStorePassword);
         } catch (FileNotFoundException e) {
           // The exception is thrown if no certificates are present in the CertificateMaterializerService
           // This means the client has just opened a connection and it's sending the certificate
-          certLocService.materializeCertificates(username, username, keyStore, keyStorePassword,
+          certLocService.materializeCertificates(username, applicationId, username, keyStore, keyStorePassword,
             trustStore, trustStorePassword);
         }
       } catch (IOException | InterruptedException e) {
@@ -9022,7 +9023,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
               UserGroupInformation ugi = ((TUGIContainingTransport)tProtocol.getTransport()).getClientUGI();
               if (ugi != null) {
                 try {
-                  certLocService.removeX509Material(ugi.getUserName());
+                  certLocService.removeX509Material(ugi.getUserName(), ugi.getApplicationId());
                 } catch (Exception e) {}
               }
               // Clean up the flag as the thread is put back in the queue for the next connection

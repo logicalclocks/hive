@@ -29,12 +29,14 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -48,6 +50,7 @@ public class TestTLSHiveMetastoreClient {
 
   private static Path serverKeyStore, serverTrustStore;
   private static Path clientKeyStore, clientTrustStore;
+  private static Path appClientKeyStore, appClientTrustStore;
   private static String outputDir;
 
   private static final String clientUsername = "Ring__Gandalf";
@@ -57,6 +60,7 @@ public class TestTLSHiveMetastoreClient {
   private static Configuration hiveConf;
 
   private HiveMetaStoreClient hmsc = null;
+  private HiveMetaStoreClient hmscUser = null;
 
   @Rule
   public final ExpectedException rule = ExpectedException.none();
@@ -84,6 +88,11 @@ public class TestTLSHiveMetastoreClient {
     hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS, "TLSv1.2,TLSv1.1,TLSv1");
     hiveConf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
 
+    MetastoreConf.setVar(hiveConf, MetastoreConf.ConfVars.RAW_STORE_IMPL,
+        DummyRawStoreForJdoConnection.class.getName());
+    MetastoreConf.setVar(hiveConf,
+        MetastoreConf.ConfVars.CONNECT_URL_HOOK, DummyJdoConnectionUrlHook.class.getName());
+    MetastoreConf.setVar(hiveConf, MetastoreConf.ConfVars.CONNECT_URL_KEY, DummyJdoConnectionUrlHook.initialUrl);
 
     // Start Hivemetastore
     hiveConf.setClass(MetastoreConf.ConfVars.EXPRESSION_PROXY_CLASS.getVarname(),
@@ -95,35 +104,28 @@ public class TestTLSHiveMetastoreClient {
     hiveConf.set(MetastoreConf.ConfVars.INIT_HOOKS.getVarname(), "");
     hiveConf.setBoolean(MetastoreConf.ConfVars.HIVE_SUPPORT_CONCURRENCY.getVarname(), false);
     hiveConf.setInt(MetastoreConf.ConfVars.THRIFT_CONNECTION_RETRIES.getVarname(), 1);
-
-    /*
-     * Test run in a single JVM so the CertificateLocalizationContext is shared between the Metastore and the client
-     * Shouldn't cause any issue, except for the testSendCrypto in which we should see that the counter for the number of
-     * instances of the client certificates is 2 (1 in the client and 1 in the metastore)
-     */
-    byte[] keyStore = Files.readAllBytes(clientKeyStore);
-    byte[] trustStore = Files.readAllBytes(clientTrustStore);
-
-    CertificateLocalization certificateLocalization = CertificateLocalizationCtx
-        .getInstance().getCertificateLocalization();
-    certificateLocalization.materializeCertificates(clientUsername, clientUsername, ByteBuffer.wrap(keyStore),
-        password, ByteBuffer.wrap(trustStore), password);
-    certificateLocalization.materializeCertificates(fakeUser, fakeUser, ByteBuffer.wrap(keyStore),
-        password, ByteBuffer.wrap(trustStore), password);
   }
+
 
   @After
   public void closeClient() throws Exception {
     if (hmsc != null) {
       hmsc.close();
     }
+
+    cleanCertificateLocalization(clientUsername, null);
+    cleanCertificateLocalization(clientUsername, "app");
+    cleanCertificateLocalization(fakeUser, "app");
   }
 
 
   @Test
   public void testClientMatchingCNUGI() throws Exception {
+    setUpCertificateLocalization(clientUsername, clientKeyStore, clientTrustStore);
+
     UserGroupInformation ugi =
         UserGroupInformation.createProxyUser(clientUsername, UserGroupInformation.getCurrentUser());
+
     ugi.doAs((PrivilegedExceptionAction<Object>) () -> {
       hmsc = new HiveMetaStoreClient(hiveConf);
       return null;
@@ -131,29 +133,111 @@ public class TestTLSHiveMetastoreClient {
 
     CertificateLocalization certificateLocalization =
         CertificateLocalizationCtx.getInstance().getCertificateLocalization();
-    // Assert is 2 as the CertificateLocalization contains the clientUsername certificate both for the client and for the
-    // HMS
-    Assert.assertEquals(2, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    // Assert is 1 as Hive metastore will update the certificate stored in the certificateLocalization service,
+    // which is one per jvm (shared by HM and tests)
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
 
     hmsc.close();
     hmsc = null;
     Thread.sleep(1000);
-    // Check that the counter is decremented correctly
-    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+
+    // The certificate should have been removed
+    rule.expect(FileNotFoundException.class);
+    certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications();
   }
 
   @Test
   public void testClientNotMatchingCNUGI() throws Exception {
     UserGroupInformation ugi =
         UserGroupInformation.createProxyUser(fakeUser, UserGroupInformation.getCurrentUser());
-    ugi.doAs(new PrivilegedExceptionAction<Object>() {
-      @Override
-      public Object run() throws Exception {
-        rule.expect(UndeclaredThrowableException.class);
-        hmsc = new HiveMetaStoreClient(hiveConf);
-        return null;
-      }
+
+    setUpCertificateLocalization(fakeUser, clientKeyStore, clientTrustStore);
+    ugi.doAs((PrivilegedExceptionAction<Object>) () -> {
+      rule.expect(UndeclaredThrowableException.class);
+      hmsc = new HiveMetaStoreClient(hiveConf);
+      return null;
     });
+
+    cleanCertificateLocalization(fakeUser, null);
+  }
+
+  @Test
+  public void testAppClient() throws Exception {
+    UserGroupInformation ugiApp =
+        UserGroupInformation.createProxyUser(clientUsername, UserGroupInformation.getCurrentUser());
+    ugiApp.addApplicationId("app");
+
+    setUpCertificateLocalization(clientUsername, appClientKeyStore, appClientTrustStore);
+    ugiApp.doAs((PrivilegedExceptionAction<Object>) () -> {
+      hmsc = new HiveMetaStoreClient(hiveConf);
+      return null;
+    });
+
+    CertificateLocalization certificateLocalization =
+        CertificateLocalizationCtx.getInstance().getCertificateLocalization();
+    // Expect only one here as it should have been saved
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    // Expect one certificate saved under the `clientUsername,app`
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername,
+        "app").getRequestedApplications());
+
+    hmsc.close();
+    hmsc = null;
+    Thread.sleep(1000);
+
+    rule.expect(FileNotFoundException.class);
+    certificateLocalization.getX509MaterialLocation(clientUsername, "app");
+    // Check that the counter is decremented correctly
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    cleanCertificateLocalization(clientUsername, null);
+  }
+
+  @Test
+  public void testConcurrentAppNonAppUser() throws Exception {
+
+    UserGroupInformation ugiApp =
+        UserGroupInformation.createProxyUser(clientUsername, UserGroupInformation.getCurrentUser());
+    ugiApp.addApplicationId("app");
+    setUpCertificateLocalization(clientUsername, appClientKeyStore, appClientTrustStore);
+
+    ugiApp.doAs((PrivilegedExceptionAction<Object>) () -> {
+      hmsc = new HiveMetaStoreClient(hiveConf);
+      return null;
+    });
+
+    UserGroupInformation ugiUser =
+        UserGroupInformation.createProxyUser(clientUsername, UserGroupInformation.getCurrentUser());
+
+    byte[] keyStore = Files.readAllBytes(clientKeyStore);
+    byte[] trustStore = Files.readAllBytes(clientTrustStore);
+
+    CertificateLocalization certificateLocalization = CertificateLocalizationCtx
+        .getInstance().getCertificateLocalization();
+    certificateLocalization.updateX509(clientUsername, null, ByteBuffer.wrap(keyStore),
+        password, ByteBuffer.wrap(trustStore), password);
+
+    ugiUser.doAs((PrivilegedExceptionAction<Object>) () -> {
+      hmscUser = new HiveMetaStoreClient(hiveConf);
+      return null;
+    });
+
+    // Expect only one here as it should have been saved
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername).getRequestedApplications());
+    // Expect one certificate saved under the `clientUsername,app`
+    Assert.assertEquals(1, certificateLocalization.getX509MaterialLocation(clientUsername,
+        "app").getRequestedApplications());
+
+    hmsc.close();
+    hmscUser.close();
+    hmsc = null;
+    Thread.sleep(1000);
+
+    // Check that the certificate has been removed correctly
+    rule.expect(FileNotFoundException.class);
+    certificateLocalization.getX509MaterialLocation(clientUsername, "app");
+    // Check that the certificate has been removed correctly
+    rule.expect(FileNotFoundException.class);
+    certificateLocalization.getX509MaterialLocation(clientUsername);
   }
 
   @Test
@@ -192,5 +276,41 @@ public class TestTLSHiveMetastoreClient {
     KeyStoreTestUtil.createKeyStore(clientKeyStore.toString(), password, password,
             "c_client_alias", c_clientKeyPair.getPrivate(), c_clientCrt);
     KeyStoreTestUtil.createTrustStore(clientTrustStore.toString(), password, "CARoot", caCert);
+
+    // Generate client certificate with the correct CN field and signed by the CA
+    KeyPair c_appClientKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
+    String c_appCn = "CN=" + clientUsername + ",O=app";
+    X509Certificate c_appClientCrt = KeyStoreTestUtil.generateSignedCertificate(c_appCn, c_appClientKeyPair, 42,
+            signAlg, caKeyPair.getPrivate(), caCert);
+
+    appClientKeyStore = Paths.get(outputDir, "c_app_client.keystore.jks");
+    appClientTrustStore = Paths.get(outputDir, "c_app_client.truststore.jks");
+    KeyStoreTestUtil.createKeyStore(appClientKeyStore.toString(), password, password,
+            "c_client_alias", c_appClientKeyPair.getPrivate(), c_appClientCrt);
+    KeyStoreTestUtil.createTrustStore(appClientTrustStore.toString(), password, "CARoot", caCert);
+  }
+
+  private void setUpCertificateLocalization(String username, Path keyStorePath, Path trustStorePath) throws Exception {
+    /*
+     * Test run in a single JVM so the CertificateLocalizationContext is shared between the Metastore and the client
+     * Shouldn't cause any issue, except for the testSendCrypto in which we should see that the counter for the number of
+     * instances of the client certificates is 2 (1 in the client and 1 in the metastore)
+     */
+    byte[] keyStore = Files.readAllBytes(keyStorePath);
+    byte[] trustStore = Files.readAllBytes(trustStorePath);
+
+    CertificateLocalization certificateLocalization = CertificateLocalizationCtx
+        .getInstance().getCertificateLocalization();
+    certificateLocalization.materializeCertificates(username, username, ByteBuffer.wrap(keyStore),
+        password, ByteBuffer.wrap(trustStore), password);
+  }
+
+  private void cleanCertificateLocalization(String username, String appId) {
+    CertificateLocalization certificateLocalization = CertificateLocalizationCtx
+        .getInstance().getCertificateLocalization();
+    try {
+      certificateLocalization.removeX509Material(username, appId);
+    } catch (Exception e) {}
   }
 }
+

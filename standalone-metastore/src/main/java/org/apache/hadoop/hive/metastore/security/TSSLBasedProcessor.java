@@ -26,6 +26,8 @@ import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.Map;
 
+import io.hops.common.Pair;
+import io.hops.security.HopsUtil;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.set_ugi_args;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.set_ugi_result;
@@ -140,7 +142,7 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
     }
   }
 
-  private String extractCN(TProtocol in) throws TException, SSLException {
+  private Pair<String, String> extractDN(TProtocol in) throws TException, SSLException {
     // Get the the certificate chain out of the TProtocol object
     TTransport tTransport = in.getTransport();
     Socket socket = ((TUGIContainingTransport) tTransport).getSocket();
@@ -154,22 +156,19 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
 
     // Client certificate is always the first
     String DN = certs[0].getSubjectDN().getName();
-    String[] dnTokens = DN.split(",");
-    String[] cnTokens = dnTokens[0].split("=", 2);
-    if (cnTokens.length != 2) {
-      throw new SSLException("Cannot authenticate the user: Unrecognized CN format");
-    }
+    String CN = HopsUtil.extractCNFromSubject(DN);
+    String applicationId = HopsUtil.extractOFromSubject(DN);
 
-    if (cnTokens[1].contains("__")) {
+    if (CN.contains("__")) {
       // The certificate is in the format projectName__userName
-      return cnTokens[1];
+      return new Pair<>(CN, applicationId);
     } else {
       // The certificate might be a machine certificate if the operation is requested
       // by the superuser
       InetAddress hostnameIp = null;
       try {
         // Hostname resolution and check against the ip of the machine doing the request
-        hostnameIp = InetAddress.getByName(cnTokens[1]);
+        hostnameIp = InetAddress.getByName(CN);
       } catch (java.net.UnknownHostException ex) {
         LOG.error("Cannot resolve machine address: ", ex);
         throw new TException("Cannot authenticate the user");
@@ -182,7 +181,7 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
         throw new TException("Cannot authenticate the user");
       }
 
-      return MetastoreConf.getVar(metastoreConf, MetastoreConf.ConfVars.HIVE_SUPER_USER);
+      return new Pair<>(MetastoreConf.getVar(metastoreConf, MetastoreConf.ConfVars.HIVE_SUPER_USER), null);
     }
   }
 
@@ -214,15 +213,20 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
       List<String> principals = result.getSuccess();
       // Store the ugi in transport and then continue as usual.
       String user = principals.remove(principals.size()-1);
-      String certificateCN = extractCN(iprot);
-      if (!user.equals(certificateCN)) {
+      Pair<String, String> certDN = extractDN(iprot);
+      if (!user.equals(certDN.getL())) {
         // Mismatch between UGI user and common name in the certificate
         LOG.error("Mismatch between the UGI user: ", user,
-            " and common name in the certificate: ", certificateCN);
+            " and common name in the certificate: ", certDN.getL());
         throw new TTransportException("Client not authorized.");
       }
 
-      ugiTrans.setClientUGI(UserGroupInformation.createRemoteUser(user));
+      clientUgi = UserGroupInformation.createRemoteUser(user);
+      if (certDN.getR() != null) {
+        clientUgi.addApplicationId(certDN.getR());
+      }
+
+      ugiTrans.setClientUGI(clientUgi);
       oprot.writeMessageBegin(new TMessage(msg.name, TMessageType.REPLY, msg.seqid));
       result.write(oprot);
       oprot.writeMessageEnd();
