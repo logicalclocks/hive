@@ -21,7 +21,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
-import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.CertificateLocalization;
@@ -30,7 +29,6 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -53,6 +51,9 @@ public class TestTLSHiveMetastoreClient {
   private static Path clientKeyStore, clientTrustStore;
   private static Path appClientKeyStore, appClientTrustStore;
   private static String outputDir;
+
+  private static X509Certificate caCert;
+  private static KeyPair caKeyPair;
 
   private static final String clientUsername = "Ring__Gandalf";
   private static final String fakeUser = "fake__user";
@@ -94,6 +95,7 @@ public class TestTLSHiveMetastoreClient {
     MetastoreConf.setVar(hiveConf,
         MetastoreConf.ConfVars.CONNECT_URL_HOOK, DummyJdoConnectionUrlHook.class.getName());
     MetastoreConf.setVar(hiveConf, MetastoreConf.ConfVars.CONNECT_URL_KEY, DummyJdoConnectionUrlHook.initialUrl);
+    MetastoreConf.setLongVar(hiveConf, MetastoreConf.ConfVars.CERT_RELOAD_THREAD_SLEEP, 1000);
 
     // Start Hivemetastore
     hiveConf.setClass(MetastoreConf.ConfVars.EXPRESSION_PROXY_CLASS.getVarname(),
@@ -293,12 +295,28 @@ public class TestTLSHiveMetastoreClient {
       return null;
     });
 
-    Thread.sleep(10000);
 
     CertificateLocalization certificateLocalization = CertificateLocalizationCtx
         .getInstance().getCertificateLocalization();
     Assert.assertEquals(1,
         certificateLocalization.getX509MaterialLocation(clientUsername, "app").getRequestedApplications());
+    int keystore1_size = certificateLocalization.getX509MaterialLocation(clientUsername, "app").getKeyStoreMem().capacity();
+
+    generateCertificate("CN=" + clientUsername + ",O=app,OU=100000",
+        "c_client_alias", appClientKeyStore, appClientTrustStore);
+
+    FileUtils.deleteQuietly(Paths.get("k_certificate").toFile());
+    FileUtils.deleteQuietly(Paths.get("t_certificate").toFile());
+    FileUtils.copyFile(appClientKeyStore.toFile(), Paths.get("k_certificate").toFile());
+    FileUtils.copyFile(appClientTrustStore.toFile(), Paths.get("t_certificate").toFile());
+
+    Thread.sleep(10000);
+
+    Assert.assertEquals(1,
+        certificateLocalization.getX509MaterialLocation(clientUsername, "app").getRequestedApplications());
+    int keystore2_size = certificateLocalization.getX509MaterialLocation(clientUsername, "app").getKeyStoreMem().capacity();
+
+    Assert.assertNotEquals(keystore1_size, keystore2_size);
 
     hmsc.close();
     hmsc = null;
@@ -320,44 +338,35 @@ public class TestTLSHiveMetastoreClient {
     String signAlg = "SHA256withRSA";
 
     // Generate CA
-    KeyPair caKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
-    X509Certificate caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg);
-
-    // Generate server certificate signed by CA
-    KeyPair serverKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
-    X509Certificate serverCrt = KeyStoreTestUtil.generateSignedCertificate("CN=" +
-            NetUtils.getHostNameOfIP("127.0.0.1"), serverKeyPair, 42,
-            signAlg, caKeyPair.getPrivate(), caCert);
+    caKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
+    caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg);
 
     serverKeyStore = Paths.get(outputDir, "server.keystore.jks");
     serverTrustStore = Paths.get(outputDir, "server.truststore.jks");
-    KeyStoreTestUtil.createKeyStore(serverKeyStore.toString(), password, password,
-            "server_alias", serverKeyPair.getPrivate(), serverCrt);
-    KeyStoreTestUtil.createTrustStore(serverTrustStore.toString(), password, "CARoot", caCert);
+    generateCertificate("CN=" + NetUtils.getHostNameOfIP("127.0.0.1"), "server_alias", serverKeyStore, serverTrustStore);
 
     // Generate client certificate with the correct CN field and signed by the CA
-    KeyPair c_clientKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
-    String c_cn = "CN=" + clientUsername;
-    X509Certificate c_clientCrt = KeyStoreTestUtil.generateSignedCertificate(c_cn, c_clientKeyPair, 42,
-            signAlg, caKeyPair.getPrivate(), caCert);
-
     clientKeyStore = Paths.get(outputDir, "c_client.keystore.jks");
     clientTrustStore = Paths.get(outputDir, "c_client.truststore.jks");
-    KeyStoreTestUtil.createKeyStore(clientKeyStore.toString(), password, password,
-            "c_client_alias", c_clientKeyPair.getPrivate(), c_clientCrt);
-    KeyStoreTestUtil.createTrustStore(clientTrustStore.toString(), password, "CARoot", caCert);
-
-    // Generate client certificate with the correct CN field and signed by the CA
-    KeyPair c_appClientKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
-    String c_appCn = "CN=" + clientUsername + ",O=app";
-    X509Certificate c_appClientCrt = KeyStoreTestUtil.generateSignedCertificate(c_appCn, c_appClientKeyPair, 42,
-            signAlg, caKeyPair.getPrivate(), caCert);
+    generateCertificate("CN=" + clientUsername, "c_client_alias", clientKeyStore, clientTrustStore);
 
     appClientKeyStore = Paths.get(outputDir, "c_app_client.keystore.jks");
     appClientTrustStore = Paths.get(outputDir, "c_app_client.truststore.jks");
-    KeyStoreTestUtil.createKeyStore(appClientKeyStore.toString(), password, password,
-            "c_client_alias", c_appClientKeyPair.getPrivate(), c_appClientCrt);
-    KeyStoreTestUtil.createTrustStore(appClientTrustStore.toString(), password, "CARoot", caCert);
+    generateCertificate("CN=" + clientUsername + ",O=app,OU=0", "c_client_alias", appClientKeyStore, appClientTrustStore);
+  }
+
+  private static void generateCertificate(String cn, String alias, Path keystore, Path truststore) throws Exception {
+    String keyAlg = "RSA";
+    String signAlg = "SHA256withRSA";
+
+    // Generate client certificate with the correct CN field and signed by the CA
+    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
+    X509Certificate clientCrt = KeyStoreTestUtil.generateSignedCertificate(cn, keyPair, 42,
+            signAlg, caKeyPair.getPrivate(), caCert);
+
+    KeyStoreTestUtil.createKeyStore(keystore.toString(), password, password,
+            alias, keyPair.getPrivate(), clientCrt);
+    KeyStoreTestUtil.createTrustStore(truststore.toString(), password, "CARoot", caCert);
   }
 
   private void setUpCertificateLocalization(String username, Path keyStorePath, Path trustStorePath) throws Exception {

@@ -657,10 +657,22 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
         // The certificates are not in the certificate materialization service, try reading from the fs
         // This might happens in the tests
         securityMaterial = readClientMaterial();
+
+        // In this case we are using the APP certificates to connect to the metastore. App certificates are rotated
+        // and revoked, which means that the client needs to periodically update the certificate cached in the metastore
+        // or else the metastore won't be able to operate on the FS if the certificate is rotated.
+        clientCertUpdaterThread = new Thread(new ClientCertUpdater(client, securityMaterial));
+        clientCertUpdaterThread.start();
       }
     } else {
       // Client not from the HS2 (Example: Spark client)
       securityMaterial = readClientMaterial();
+
+      // In this case we are using the APP certificates to connect to the metastore. App certificates are rotated
+      // and revoked, which means that the client needs to periodically update the certificate cached in the metastore
+      // or else the metastore won't be able to operate on the FS if the certificate is rotated.
+      clientCertUpdaterThread = new Thread(new ClientCertUpdater(client, securityMaterial));
+      clientCertUpdaterThread.start();
     }
 
     return securityMaterial;
@@ -684,15 +696,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     ByteBuffer keyStore = ByteBuffer.wrap(FileUtils.readFileToByteArray(new File("k_certificate")));
     ByteBuffer trustStore = ByteBuffer.wrap(FileUtils.readFileToByteArray(new File("t_certificate")));
 
-    HopsSecurityMaterial securityMaterial = new HopsSecurityMaterial("k_certificate", keyStore, key,
+    return new HopsSecurityMaterial("k_certificate", keyStore, key,
         "t_certificate", trustStore, key);
-    // In this case we are using the APP certificates to connect to the metastore. App certificates are rotated
-    // and revoked, which means that the client needs to periodically update the certificate cached in the metastore
-    // or else the metastore won't be able to operate on the FS if the certificate is rotated.
-    clientCertUpdaterThread = new Thread(new ClientCertUpdater(client, securityMaterial));
-    clientCertUpdaterThread.start();
-
-    return securityMaterial;
   }
 
   public class HopsSecurityMaterial {
@@ -739,12 +744,10 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
   }
 
   private class ClientCertUpdater implements Runnable {
-    private ThriftHiveMetastore.Iface client;
     private HopsSecurityMaterial securityMaterial;
     private long lastLoaded = -1L;
 
     ClientCertUpdater(ThriftHiveMetastore.Iface client, HopsSecurityMaterial securityMaterial) {
-      this.client = client;
       this.securityMaterial = securityMaterial;
     }
 
