@@ -752,7 +752,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     public void run() {
       while (!Thread.currentThread().isInterrupted()) {
         try {
-          Thread.sleep(5000);
+          Thread.sleep(MetastoreConf.getLongVar(conf, ConfVars.CERT_RELOAD_THREAD_SLEEP));
           File trustStore = new File(securityMaterial.getTrustStorePath());
           if (trustStore.lastModified() != lastLoaded) {
             securityMaterial = readClientMaterial();
