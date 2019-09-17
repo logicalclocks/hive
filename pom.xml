@@ -17,7 +17,7 @@
 
   <groupId>io.hops.hive</groupId>
   <artifactId>hive</artifactId>
-  <version>3.0.0.1</version>
+  <version>3.0.0.2</version>
   <packaging>pom</packaging>
 
   <name>Hive</name>
@@ -41,6 +41,7 @@
     <module>jdbc</module>
     <module>metastore</module>
     <module>ql</module>
+    <module>cli</module>
     <module>serde</module>
     <module>service-rpc</module>
     <module>service</module>
