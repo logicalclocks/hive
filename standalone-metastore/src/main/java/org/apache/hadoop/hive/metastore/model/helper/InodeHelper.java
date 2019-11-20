@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import org.apache.hadoop.fs.Path;
 
 /**
  * This class helps retrieve the inode id given the path of the file/directory
@@ -120,9 +121,9 @@ public class InodeHelper implements Configurable {
       return new InodePK();
     }
 
-    // Strip ip address and port hdfs://ip:port/path
-    int pathSlashIdx = path.indexOf('/', 7);
-    path = path.substring(pathSlashIdx, path.length());
+    // Strip ip address and port hopsfs://ip:port/path    
+    Path p = new Path(path);
+    path = p.toUri().getPath();
 
     // Get connection from the pool
     Connection dbConn = null;
