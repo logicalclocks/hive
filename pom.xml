@@ -141,7 +141,7 @@
     <flatbuffers.version>1.2.0-3f79e055</flatbuffers.version>
     <guava.version>19.0</guava.version>
     <groovy.version>2.4.11</groovy.version>
-    <hadoop.version>2.8.2.8</hadoop.version>
+    <hadoop.version>2.8.2.9-SNAPSHOT</hadoop.version>
     <h2database.version>1.3.166</h2database.version>
     <hadoop.bin.path>${basedir}/${hive.path.to.root}/testutils/hadoop</hadoop.bin.path>
     <hamcrest.version>1.3</hamcrest.version>
@@ -1117,22 +1117,6 @@
         <artifactId>maven-enforcer-plugin</artifactId>
         <executions>
           <execution>
-            <id>enforce-no-snapshots</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <configuration>
-              <rules>
-                <requireReleaseDeps>
-                  <message>Release builds are not allowed to have SNAPSHOT depenendencies</message>
-                  <searchTransitive>true</searchTransitive>
-                  <onlyWhenRelease>true</onlyWhenRelease>
-                </requireReleaseDeps>
-              </rules>
-              <fail>false</fail>
-            </configuration>
-          </execution>
-          <execution>
             <id>enforce-banned-dependencies</id>
             <goals>
               <goal>enforce</goal>
@@ -1317,7 +1301,7 @@
         <dependency>
           <groupId>com.mysql.ndb</groupId>
           <artifactId>clusterj-native</artifactId>
-          <version>7.6.9</version>
+          <version>7.6.12</version>
           <classifier>natives-linux</classifier>
         </dependency>
         <dependency>

@@ -78,6 +78,8 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.hops.security.CertificateLocalizationCtx;
+import io.hops.security.CertificateLocalizationService;
 
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.configuration.ConfigurationKey;
@@ -168,8 +170,6 @@ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.utils.MetastoreVersionInfo;
 import org.apache.hadoop.hive.metastore.utils.SecurityUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
-import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;

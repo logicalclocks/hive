@@ -44,6 +44,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import javax.servlet.HttpConstraintElement;
 
+import io.hops.security.CertificateLocalizationCtx;
+import io.hops.security.CertificateLocalizationService;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hive.llap.LlapUtil;
@@ -54,8 +56,6 @@ import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos;
 import org.apache.hadoop.hive.llap.tezplugins.LlapTezUtils;
 import org.apache.hadoop.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
-import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hive.http.HttpServer;
 import org.apache.slider.common.SliderXmlConfKeys;
 import org.apache.tez.dag.api.TezConfiguration;
