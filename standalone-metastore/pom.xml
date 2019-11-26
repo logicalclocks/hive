@@ -19,12 +19,12 @@
 
   <groupId>io.hops.hive</groupId>
   <artifactId>hive-standalone-metastore</artifactId>
-  <version>3.0.0.2</version>
+  <version>3.0.0.3-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Hive Standalone Metastore</name>
 
   <properties>
-    <hive.version.shortname>3.0.0.1</hive.version.shortname>
+    <hive.version.shortname>3.0.0.3</hive.version.shortname>
 
     <!-- Build properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -65,7 +65,7 @@
     <dropwizard-metrics-hadoop-metrics2-reporter.version>0.1.2</dropwizard-metrics-hadoop-metrics2-reporter.version>
     <dropwizard.version>3.1.0</dropwizard.version>
     <guava.version>19.0</guava.version>
-    <hadoop.version>2.8.2.8-SNAPSHOT</hadoop.version>
+    <hadoop.version>2.8.2.9-SNAPSHOT</hadoop.version>
     <hikaricp.version>2.6.1</hikaricp.version>
     <jackson.version>2.9.4</jackson.version>
     <javolution.version>5.5.1</javolution.version>
@@ -219,22 +219,6 @@
           <artifactId>commons-logging</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-    <dependency>
-     <groupId>io.hops</groupId>
-     <artifactId>hadoop-hdfs</artifactId>
-     <version>${hadoop.version}</version>
-     <optional>true</optional>
-     <exclusions>
-       <exclusion>
-         <groupId>org.slf4j</groupId>
-         <artifactId>slf4j-log4j12</artifactId>
-       </exclusion>
-       <exclusion>
-         <groupId>commmons-logging</groupId>
-         <artifactId>commons-logging</artifactId>
-       </exclusion>
-     </exclusions>
     </dependency>
     <dependency>
      <groupId>io.hops</groupId>

@@ -22,14 +22,14 @@
   <parent>
     <groupId>io.hops.hive</groupId>
     <artifactId>hive</artifactId>
-    <version>3.0.0.2</version>
+    <version>3.0.0.3-SNAPSHOT</version>
   </parent>
 
   <groupId>io.hops.hive</groupId>
   <artifactId>hive-spark-client</artifactId>
   <packaging>jar</packaging>
   <name>Hive Spark Remote Client</name>
-  <version>3.0.0.2</version>
+  <version>3.0.0.3-SNAPSHOT</version>
 
   <properties>
     <hive.path.to.root>..</hive.path.to.root>
@@ -115,7 +115,7 @@
        </exclusion>
        <exclusion>
          <groupId>org.apache.hadoop</groupId>
-         <artifactId>hadoop-client</artifactId>
+         <artifactId>*</artifactId>
        </exclusion>
      </exclusions>
    </dependency>

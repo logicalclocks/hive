@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.LongAdder;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
+import io.hops.security.CertificateLocalizationCtx;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.common.metrics.common.Metrics;
@@ -46,7 +47,6 @@ import org.apache.hadoop.hive.common.metrics.common.MetricsVariable;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.hooks.HookUtils;
-import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.SessionHandle;

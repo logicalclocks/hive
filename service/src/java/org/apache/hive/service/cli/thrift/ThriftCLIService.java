@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import javax.security.auth.login.LoginException;
 import javax.security.sasl.AuthenticationException;
 
+import io.hops.security.CertificateLocalizationCtx;
 import okhttp3.OkHttpClient;
 import okhttp3.FormBody;
 import okhttp3.Request;
@@ -46,7 +47,6 @@ import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.shims.HadoopShims.KerberosNameShim;
 import org.apache.hadoop.hive.shims.ShimLoader;
-import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hive.service.AbstractService;
 import org.apache.hive.service.ServiceException;
 import org.apache.hive.service.ServiceUtils;
