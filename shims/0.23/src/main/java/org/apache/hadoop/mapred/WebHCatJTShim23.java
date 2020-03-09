@@ -212,7 +212,7 @@ public class WebHCatJTShim23 implements WebHCatJTShim {
     gar.setApplicationTags(Collections.singleton(tag));
     try {
       ApplicationClientProtocol proxy = ClientRMProxy.createRMProxy(conf,
-          ApplicationClientProtocol.class, true);
+          ApplicationClientProtocol.class);
       GetApplicationsResponse apps = proxy.getApplications(gar);
       List<ApplicationReport> appsList = apps.getApplicationList();
       for(ApplicationReport appReport : appsList) {

@@ -8,8 +8,8 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.LinkedList;
 
-import static org.apache.hadoop.security.ssl.SSLFactory.DEFAULT_SSL_ENABLED_PROTOCOLS;
-import static org.apache.hadoop.security.ssl.SSLFactory.SSL_ENABLED_PROTOCOLS;
+import static org.apache.hadoop.security.ssl.SSLFactory.SSL_ENABLED_PROTOCOLS_KEY;
+import static org.apache.hadoop.security.ssl.SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT;
 import static org.apache.hadoop.security.ssl.SSLFactory.SSL_SERVER_EXCLUDE_CIPHER_LIST;
 
 public class TServerSocketFactory {
@@ -32,7 +32,7 @@ public class TServerSocketFactory {
                 params.ifAddress = serverAddress;
                 params.clientAuth = socketType == TSocketType.TWOWAYTLS;
                 params.clientTimeout = 0;
-                params.enabledProtocols = conf.getStrings(SSL_ENABLED_PROTOCOLS, DEFAULT_SSL_ENABLED_PROTOCOLS);
+                params.enabledProtocols = conf.getStrings(SSL_ENABLED_PROTOCOLS_KEY, SSL_ENABLED_PROTOCOLS_DEFAULT);
 
                 String excludeCiphersConf = conf.get(SSL_SERVER_EXCLUDE_CIPHER_LIST, "");
                 if (excludeCiphersConf.isEmpty()) {

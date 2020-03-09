@@ -40,7 +40,6 @@
       <useTransitiveFiltering>true</useTransitiveFiltering>
       <excludes>
         <exclude>io.hops:*</exclude>
-        <exclude>io.hops.gpu:*</exclude>
         <exclude>io.hops.hive.hcatalog:*</exclude>
         <exclude>org.slf4j:*</exclude>
         <exclude>log4j:*</exclude>

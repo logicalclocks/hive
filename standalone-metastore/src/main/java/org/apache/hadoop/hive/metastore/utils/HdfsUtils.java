@@ -167,17 +167,17 @@ public class HdfsUtils {
 
   public static boolean runDistCp(List<Path> srcPaths, Path dst, Configuration conf)
       throws IOException {
-    DistCpOptions options = new DistCpOptions(srcPaths, dst);
-    options.setSyncFolder(true);
-    options.setSkipCRC(false);
-    options.preserve(FileAttribute.BLOCKSIZE);
+    DistCpOptions.Builder optionsBuilder = new DistCpOptions.Builder(srcPaths, dst);
+    optionsBuilder.withSyncFolder(true);
+    optionsBuilder.withCRC(false);
+    optionsBuilder.preserve(FileAttribute.BLOCKSIZE);
 
     // Creates the command-line parameters for distcp
     List<String> params = constructDistCpParams(srcPaths, dst, conf);
 
     try {
       conf.setBoolean("mapred.mapper.new-api", true);
-      DistCp distcp = new DistCp(conf, options);
+      DistCp distcp = new DistCp(conf, optionsBuilder.build());
 
       // HIVE-13704 states that we should use run() instead of execute() due to a hadoop known issue
       // added by HADOOP-10459

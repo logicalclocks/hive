@@ -9,8 +9,6 @@ import com.logicalclocks.servicediscoverclient.exceptions.ServiceDiscoveryExcept
 import com.logicalclocks.servicediscoverclient.service.Service;
 import com.logicalclocks.servicediscoverclient.service.ServiceQuery;
 import io.hops.net.ServiceDiscoveryClientFactory;
-import net.spy.memcached.compat.log.Logger;
-import net.spy.memcached.compat.log.LoggerFactory;
 import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -22,6 +20,8 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CachedServiceDiscoveryResolver {
   private static final Logger LOG = LoggerFactory.getLogger(CachedServiceDiscoveryResolver.class);

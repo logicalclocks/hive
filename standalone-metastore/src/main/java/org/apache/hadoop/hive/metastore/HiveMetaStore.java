@@ -82,7 +82,6 @@ import io.hops.security.CertificateLocalizationCtx;
 import io.hops.security.CertificateLocalizationService;
 
 import org.apache.commons.cli.OptionBuilder;
-import org.apache.commons.configuration.ConfigurationKey;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;

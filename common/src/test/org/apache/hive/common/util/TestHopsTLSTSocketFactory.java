@@ -109,7 +109,7 @@ public class TestHopsTLSTSocketFactory {
     hiveConf.addResource("ssl-server.xml");
     hiveConf.setLong(resolvePropertyName(SSLFactory.Mode.SERVER, SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY), 1000);
     hiveConf.setLong(resolvePropertyName(SSLFactory.Mode.SERVER, SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY), 1000);
-    hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS, "TLSv1.2,TLSv1.1,TLSv1");
+    hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1,TLSv1");
     hiveConf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
 
     TServerSocket serverSocket = TServerSocketFactory.

@@ -84,7 +84,7 @@ public class TestHS2TLSServer {
     hiveConf.setVar(HiveConf.ConfVars.HIVE_SUPER_USER, UserGroupInformation.getCurrentUser().getUserName());
     hiveConf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
     hiveConf.addResource("ssl-server.xml");
-    hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS, "TLSv1.2,TLSv1.1,TLSv1");
+    hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1,TLSv1");
     hiveConf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
 
     hiveConf.setIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_PORT_2WSSL, portTLS);
