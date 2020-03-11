@@ -20,6 +20,13 @@ package org.apache.hadoop.hive.metastore;
 import com.codahale.metrics.Counter;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Sets;
+import com.logicalclocks.servicediscoverclient.exceptions.ServiceDiscoveryException;
+import com.logicalclocks.servicediscoverclient.resolvers.DnsResolver;
+import com.logicalclocks.servicediscoverclient.service.Service;
+import com.logicalclocks.servicediscoverclient.service.ServiceQuery;
+import io.hops.net.ServiceDiscoveryClientFactory;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.ObjectStore.RetryingExecutor;
 import org.apache.hadoop.conf.Configuration;
@@ -80,6 +87,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.apache.hadoop.hive.metastore.Warehouse.DEFAULT_CATALOG_NAME;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.when;
 
 @Category(MetastoreUnitTest.class)
 public class TestObjectStore {
@@ -199,7 +208,41 @@ public class TestObjectStore {
     wh.deleteDir(db1Path, true);
     wh.deleteDir(db2Path, true);
   }
+  
+  @Test
+  public void testDatabaseOpsWithServiceDiscovery() throws MetaException, InvalidObjectException,
+      NoSuchObjectException, ServiceDiscoveryException {
+    conf.setBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY, true);
 
+    String locationURI = "hdfs://namenode.service.consul:8020/some/location.db";
+    String expectedURI = "hdfs://10.0.0.1:8020/some/location.db";
+    
+    Set<Service> nns = Sets.newHashSet(
+        Service.of("namenode.service.consul", "10.0.0.1", 8020),
+        Service.of("namenode.service.consul", "10.0.0.1", 50470));
+    DnsResolver dnsResolver = Mockito.mock(DnsResolver.class);
+    when(dnsResolver.getService(any(ServiceQuery.class))).thenReturn(nns.stream());
+  
+    ServiceDiscoveryClientFactory.getInstance().setClient(dnsResolver);
+    Path db1Path = new Path(wh.getWhRoot(), DB1);
+    wh.mkdirs(db1Path);
+  
+    String catName = "tdo1_cat";
+    createTestCatalog(catName);
+    Catalog catalog = objectStore.getCatalog(catName);
+    // Catalog URI does not have a host so Service Discovery should not touch it
+    assertEquals("/tmp", catalog.getLocationUri());
+    
+    // It's necessary to set it again as the first stream is consumed by the creation of the Catalog
+    when(dnsResolver.getService(any(ServiceQuery.class))).thenReturn(nns.stream());
+    Database db1 = new Database(DB1, "description", locationURI, null);
+    db1.setCatalogName(catName);
+    objectStore.createDatabase(db1);
+  
+    Database db = objectStore.getDatabase(catName, DB1);
+    assertEquals(expectedURI, db.getLocationUri());
+  }
+  
   /**
    * Test table operations
    */

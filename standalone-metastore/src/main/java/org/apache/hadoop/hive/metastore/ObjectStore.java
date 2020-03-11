@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -47,6 +48,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -56,6 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.jdo.JDOCanRetryException;
 import javax.jdo.JDODataStoreException;
 import javax.jdo.JDOException;
@@ -71,6 +74,13 @@ import javax.jdo.identity.IntIdentity;
 import javax.sql.DataSource;
 
 import com.google.common.base.Strings;
+import com.google.common.net.InetAddresses;
+import com.logicalclocks.servicediscoverclient.Builder;
+import com.logicalclocks.servicediscoverclient.ServiceDiscoveryClient;
+import com.logicalclocks.servicediscoverclient.exceptions.ServiceDiscoveryException;
+import com.logicalclocks.servicediscoverclient.service.Service;
+import com.logicalclocks.servicediscoverclient.service.ServiceQuery;
+import io.hops.net.ServiceDiscoveryClientFactory;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -79,6 +89,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.MetaStoreDirectSql.SqlFilterForPushdown;
@@ -930,8 +941,9 @@ public class ObjectStore implements RawStore, Configurable {
     return mCat;
   }
 
-  private Catalog mCatToCat(MCatalog mCat) {
-    Catalog cat = new Catalog(mCat.getName(), mCat.getSd() != null ? mCat.getSd().getLocation() : null);
+  private Catalog mCatToCat(MCatalog mCat) throws MetaException {
+    Catalog cat = new Catalog(mCat.getName(), mCat.getSd() != null ? resolveLocationURI(mCat.getSd().getLocation()) :
+        null);
     if (mCat.getDescription() != null) {
       cat.setDescription(mCat.getDescription());
     }
@@ -996,6 +1008,9 @@ public class ObjectStore implements RawStore, Configurable {
     Database db = null;
     try {
       db = getDatabaseInternal(catalogName, name);
+      if (db != null) {
+        db.setLocationUri(resolveLocationURI(db.getLocationUri()));
+      }
     } catch (MetaException e) {
       // Signature restriction to NSOE, and NSOE being a flat exception prevents us from
       // setting the cause of the NSOE as the MetaException. We should not lose the info
@@ -2071,7 +2086,7 @@ public class ObjectStore implements RawStore, Configurable {
     List<MFieldSchema> mFieldSchemas = msd.getCD() == null ? null : msd.getCD().getCols();
 
     StorageDescriptor sd = new StorageDescriptor(noFS ? null : convertToFieldSchemas(mFieldSchemas),
-        msd.getLocation(), msd.getInputFormat(), msd.getOutputFormat(), msd
+        resolveLocationURI(msd.getLocation()), msd.getInputFormat(), msd.getOutputFormat(), msd
         .isCompressed(), msd.getNumBuckets(), convertToSerDeInfo(msd
         .getSerDeInfo()), convertList(msd.getBucketCols()), convertToOrders(msd
         .getSortCols()), convertMap(msd.getParameters()));
@@ -2180,8 +2195,8 @@ public class ObjectStore implements RawStore, Configurable {
     if (sd == null) {
       return null;
     }
-    return new MStorageDescriptor(mcd, sd
-        .getLocation(), sd.getInputFormat(), sd.getOutputFormat(), sd
+    return new MStorageDescriptor(mcd, sd.getLocation(),
+        sd.getInputFormat(), sd.getOutputFormat(), sd
         .isCompressed(), sd.getNumBuckets(), convertToMSerDeInfo(sd
         .getSerdeInfo()), sd.getBucketCols(),
         convertToMOrders(sd.getSortCols()), sd.getParameters(),
@@ -11791,5 +11806,42 @@ public class ObjectStore implements RawStore, Configurable {
     }
     return ret;
   }
-
+  
+  private String resolveLocationURI(String locationURI) throws MetaException {
+    if (!conf.getBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY,
+        CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_ENABLED)) {
+      return locationURI;
+    }
+    URI uri = URI.create(locationURI);
+    if (Strings.isNullOrEmpty(uri.getHost())) {
+      return locationURI;
+    }
+    if (InetAddresses.isInetAddress(uri.getHost())) {
+      return locationURI;
+    }
+    ServiceDiscoveryClient client = null;
+    try {
+      Builder sdBuilder = new Builder(com.logicalclocks.servicediscoverclient.resolvers.Type.DNS)
+          .withDnsHost(conf.get(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_HOST,
+              CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_HOST))
+          .withDnsPort(conf.getInt(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_PORT,
+              CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_PORT));
+      client = ServiceDiscoveryClientFactory.getInstance().getClient(sdBuilder);
+      Optional<Service> nn = client.getService(ServiceQuery.of(uri.getHost(), Collections.emptySet()))
+          .findAny();
+      if (!nn.isPresent()) {
+        throw new MetaException("Service Discovery is enabled but could not resolve domain " + uri.getHost());
+      }
+      return new URI(uri.getScheme(), uri.getUserInfo(), nn.get().getAddress() , uri.getPort(), uri.getPath(),
+          uri.getQuery(), uri.getFragment()).toString();
+    } catch (ServiceDiscoveryException | URISyntaxException ex) {
+      String msg = "Could not resolve NameNode service with Service Discovery";
+      LOG.warn(msg, ex);
+      throw new MetaException(ex.getMessage() != null ? ex.getMessage() : msg);
+    } finally {
+      if (client != null) {
+        client.close();
+      }
+    }
+  }
 }
