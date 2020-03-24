@@ -111,6 +111,7 @@ class MetaStoreDirectSql {
   private static final Logger LOG = LoggerFactory.getLogger(MetaStoreDirectSql.class);
   private final PersistenceManager pm;
   private final String schema;
+  private final CachedServiceDiscoveryResolver serviceDiscoveryClient;
 
   /**
    * We want to avoid db-specific code in this class and stick with ANSI SQL. However:
@@ -147,6 +148,7 @@ class MetaStoreDirectSql {
   public MetaStoreDirectSql(PersistenceManager pm, Configuration conf, String schema) {
     this.pm = pm;
     this.schema = schema;
+    this.serviceDiscoveryClient = new CachedServiceDiscoveryResolver(conf);
     DatabaseProduct dbType = null;
     try {
       dbType = DatabaseProduct.determineDatabaseProduct(getProductName(pm));
@@ -371,7 +373,7 @@ class MetaStoreDirectSql {
       }
       Database db = new Database();
       db.setName(extractSqlString(dbline[1]));
-      db.setLocationUri(extractSqlString(dbline[2]));
+      db.setLocationUri(serviceDiscoveryClient.resolveLocationURI(extractSqlString(dbline[2])));
       db.setDescription(extractSqlString(dbline[3]));
       db.setOwnerName(extractSqlString(dbline[4]));
       String type = extractSqlString(dbline[5]);
@@ -705,7 +707,7 @@ class MetaStoreDirectSql {
       if (tmpBoolean != null) sd.setCompressed(tmpBoolean);
       tmpBoolean = extractSqlBoolean(fields[8]);
       if (tmpBoolean != null) sd.setStoredAsSubDirectories(tmpBoolean);
-      sd.setLocation((String)fields[9]);
+      sd.setLocation(serviceDiscoveryClient.resolveLocationURI((String)fields[9]));
       if (fields[10] != null) sd.setNumBuckets(extractSqlInt(fields[10]));
       sd.setOutputFormat((String)fields[11]);
       sdSb.append(sdId).append(",");

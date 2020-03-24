@@ -312,7 +312,7 @@ public class ObjectStore implements RawStore, Configurable {
   private TXN_STATUS transactionStatus = TXN_STATUS.NO_STATE;
   private Pattern partitionValidationPattern;
   private Counter directSqlErrors;
-  private ServiceDiscoveryClient serviceDiscoveryClient;
+  private CachedServiceDiscoveryResolver serviceDiscoveryClient;
 
   /**
    * A Autocloseable wrapper around Query class to pass the Query object to the caller and let the caller release
@@ -383,7 +383,7 @@ public class ObjectStore implements RawStore, Configurable {
       currentTransaction = null;
       transactionStatus = TXN_STATUS.NO_STATE;
 
-      initializeServiceDiscoveryClient();
+      serviceDiscoveryClient = new CachedServiceDiscoveryResolver(conf);
       initialize(propsFromConf);
 
       String partitionValidationRegex =
@@ -947,8 +947,8 @@ public class ObjectStore implements RawStore, Configurable {
   }
 
   private Catalog mCatToCat(MCatalog mCat) throws MetaException {
-    Catalog cat = new Catalog(mCat.getName(), mCat.getSd() != null ? resolveLocationURI(mCat.getSd().getLocation()) :
-        null);
+    Catalog cat = new Catalog(mCat.getName(), mCat.getSd() != null ?
+            serviceDiscoveryClient.resolveLocationURI(mCat.getSd().getLocation()) : null);
     if (mCat.getDescription() != null) {
       cat.setDescription(mCat.getDescription());
     }
@@ -1014,7 +1014,7 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       db = getDatabaseInternal(catalogName, name);
       if (db != null) {
-        db.setLocationUri(resolveLocationURI(db.getLocationUri()));
+        db.setLocationUri(serviceDiscoveryClient.resolveLocationURI(db.getLocationUri()));
       }
     } catch (MetaException e) {
       // Signature restriction to NSOE, and NSOE being a flat exception prevents us from
@@ -2091,7 +2091,7 @@ public class ObjectStore implements RawStore, Configurable {
     List<MFieldSchema> mFieldSchemas = msd.getCD() == null ? null : msd.getCD().getCols();
 
     StorageDescriptor sd = new StorageDescriptor(noFS ? null : convertToFieldSchemas(mFieldSchemas),
-        resolveLocationURI(msd.getLocation()), msd.getInputFormat(), msd.getOutputFormat(), msd
+        serviceDiscoveryClient.resolveLocationURI(msd.getLocation()), msd.getInputFormat(), msd.getOutputFormat(), msd
         .isCompressed(), msd.getNumBuckets(), convertToSerDeInfo(msd
         .getSerDeInfo()), convertList(msd.getBucketCols()), convertToOrders(msd
         .getSortCols()), convertMap(msd.getParameters()));
@@ -11810,57 +11810,5 @@ public class ObjectStore implements RawStore, Configurable {
       }
     }
     return ret;
-  }
-
-  private void initializeServiceDiscoveryClient() {
-    if (conf.getBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY,
-            CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_ENABLED)) {
-      ServiceDiscoveryClient dnsResolver = null;
-      try {
-        dnsResolver = new Builder(com.logicalclocks.servicediscoverclient.resolvers.Type.DNS)
-                .withDnsHost(conf.get(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_HOST,
-                        CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_HOST))
-                .withDnsPort(conf.getInt(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_PORT,
-                        CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_PORT))
-                .build();
-        Builder cachedDNSResolver = new Builder(com.logicalclocks.servicediscoverclient.resolvers.Type.CACHING)
-                .withCacheExpiration(Duration.of(30, ChronoUnit.SECONDS))
-                .withServiceDiscoveryClient(dnsResolver);
-        serviceDiscoveryClient = ServiceDiscoveryClientFactory.getInstance().getClient(cachedDNSResolver);
-      } catch (ServiceDiscoveryException ex) {
-        if (dnsResolver != null) {
-          dnsResolver.close();
-          throw new RuntimeException("Could not initialize Service Discovery client", ex);
-        }
-      }
-    }
-  }
-
-  private String resolveLocationURI(String locationURI) throws MetaException {
-    // We are not configured to run with service discovery
-    if (serviceDiscoveryClient == null) {
-      return locationURI;
-    }
-
-    URI uri = URI.create(locationURI);
-    if (Strings.isNullOrEmpty(uri.getHost())) {
-      return locationURI;
-    }
-    if (InetAddresses.isInetAddress(uri.getHost())) {
-      return locationURI;
-    }
-    try {
-      Optional<Service> nn = serviceDiscoveryClient.getService(ServiceQuery.of(uri.getHost(), Collections.emptySet()))
-          .findAny();
-      if (!nn.isPresent()) {
-        throw new MetaException("Service Discovery is enabled but could not resolve domain " + uri.getHost());
-      }
-      return new URI(uri.getScheme(), uri.getUserInfo(), nn.get().getAddress() , uri.getPort(), uri.getPath(),
-          uri.getQuery(), uri.getFragment()).toString();
-    } catch (ServiceDiscoveryException | URISyntaxException ex) {
-      String msg = "Could not resolve NameNode service with Service Discovery";
-      LOG.warn(msg, ex);
-      throw new MetaException(ex.getMessage() != null ? ex.getMessage() : msg);
-    }
   }
 }
