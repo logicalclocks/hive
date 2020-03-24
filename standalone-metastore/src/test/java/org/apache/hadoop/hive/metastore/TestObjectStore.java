@@ -21,8 +21,10 @@ import com.codahale.metrics.Counter;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
-import com.logicalclocks.servicediscoverclient.exceptions.ServiceDiscoveryException;
+import com.logicalclocks.servicediscoverclient.Builder;
+import com.logicalclocks.servicediscoverclient.resolvers.CachingResolver;
 import com.logicalclocks.servicediscoverclient.resolvers.DnsResolver;
+import com.logicalclocks.servicediscoverclient.resolvers.Type;
 import com.logicalclocks.servicediscoverclient.service.Service;
 import com.logicalclocks.servicediscoverclient.service.ServiceQuery;
 import io.hops.net.ServiceDiscoveryClientFactory;
@@ -65,8 +67,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.google.common.base.Supplier;
-
 import org.junit.experimental.categories.Category;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -88,7 +88,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.assertEquals;
 import static org.apache.hadoop.hive.metastore.Warehouse.DEFAULT_CATALOG_NAME;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @Category(MetastoreUnitTest.class)
 public class TestObjectStore {
@@ -210,8 +210,7 @@ public class TestObjectStore {
   }
   
   @Test
-  public void testDatabaseOpsWithServiceDiscovery() throws MetaException, InvalidObjectException,
-      NoSuchObjectException, ServiceDiscoveryException {
+  public void testDatabaseOpsWithServiceDiscovery() throws Exception {
     conf.setBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY, true);
 
     String locationURI = "hdfs://namenode.service.consul:8020/some/location.db";
@@ -222,8 +221,23 @@ public class TestObjectStore {
         Service.of("namenode.service.consul", "10.0.0.1", 50470));
     DnsResolver dnsResolver = Mockito.mock(DnsResolver.class);
     when(dnsResolver.getService(any(ServiceQuery.class))).thenReturn(nns.stream());
-  
-    ServiceDiscoveryClientFactory.getInstance().setClient(dnsResolver);
+
+
+    Builder cachingResolverBuilder = new Builder(Type.CACHING)
+            .withServiceDiscoveryClient(dnsResolver);
+    CachingResolver cachingResolver = mock(CachingResolver.class);
+    doCallRealMethod().when(cachingResolver).init(any(Builder.class));
+    when(cachingResolver.getService(any(ServiceQuery.class))).thenCallRealMethod();
+    cachingResolver.init(cachingResolverBuilder);
+
+    ServiceDiscoveryClientFactory.getInstance().setClient(cachingResolver);
+
+    // We need to create a new ObjectStore here to initializeServiceDiscovery
+    objectStore = new ObjectStore();
+    objectStore.setConf(conf);
+    wh = new Warehouse(conf);
+    dropAllStoreObjects(objectStore);
+    HiveMetaStore.HMSHandler.createDefaultCatalog(objectStore, wh);
     Path db1Path = new Path(wh.getWhRoot(), DB1);
     wh.mkdirs(db1Path);
   
@@ -241,6 +255,8 @@ public class TestObjectStore {
   
     Database db = objectStore.getDatabase(catName, DB1);
     assertEquals(expectedURI, db.getLocationUri());
+    verify(cachingResolver, atLeastOnce()).getService(any(ServiceQuery.class));
+    verify(dnsResolver, times(1)).getService(any(ServiceQuery.class));
   }
   
   /**

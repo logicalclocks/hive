@@ -34,8 +34,10 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -58,7 +60,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import javax.jdo.JDOCanRetryException;
 import javax.jdo.JDODataStoreException;
 import javax.jdo.JDOException;
@@ -207,7 +208,6 @@ import org.apache.hadoop.hive.metastore.model.MTable;
 import org.apache.hadoop.hive.metastore.model.MTableColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MTableColumnStatistics;
 import org.apache.hadoop.hive.metastore.model.MTablePrivilege;
-import org.apache.hadoop.hive.metastore.model.MTableWrite;
 import org.apache.hadoop.hive.metastore.model.MType;
 import org.apache.hadoop.hive.metastore.model.MVersionTable;
 import org.apache.hadoop.hive.metastore.model.MWMMapping;
@@ -312,6 +312,7 @@ public class ObjectStore implements RawStore, Configurable {
   private TXN_STATUS transactionStatus = TXN_STATUS.NO_STATE;
   private Pattern partitionValidationPattern;
   private Counter directSqlErrors;
+  private ServiceDiscoveryClient serviceDiscoveryClient;
 
   /**
    * A Autocloseable wrapper around Query class to pass the Query object to the caller and let the caller release
@@ -382,6 +383,7 @@ public class ObjectStore implements RawStore, Configurable {
       currentTransaction = null;
       transactionStatus = TXN_STATUS.NO_STATE;
 
+      initializeServiceDiscoveryClient();
       initialize(propsFromConf);
 
       String partitionValidationRegex =
@@ -711,6 +713,9 @@ public class ObjectStore implements RawStore, Configurable {
     LOG.debug("RawStore: {}, with PersistenceManager: {} will be shutdown", this, pm);
     if (pm != null) {
       pm.close();
+    }
+    if (serviceDiscoveryClient != null) {
+      serviceDiscoveryClient.close();
     }
   }
 
@@ -11806,12 +11811,37 @@ public class ObjectStore implements RawStore, Configurable {
     }
     return ret;
   }
-  
+
+  private void initializeServiceDiscoveryClient() {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY,
+            CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_ENABLED)) {
+      ServiceDiscoveryClient dnsResolver = null;
+      try {
+        dnsResolver = new Builder(com.logicalclocks.servicediscoverclient.resolvers.Type.DNS)
+                .withDnsHost(conf.get(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_HOST,
+                        CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_HOST))
+                .withDnsPort(conf.getInt(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_PORT,
+                        CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_PORT))
+                .build();
+        Builder cachedDNSResolver = new Builder(com.logicalclocks.servicediscoverclient.resolvers.Type.CACHING)
+                .withCacheExpiration(Duration.of(30, ChronoUnit.SECONDS))
+                .withServiceDiscoveryClient(dnsResolver);
+        serviceDiscoveryClient = ServiceDiscoveryClientFactory.getInstance().getClient(cachedDNSResolver);
+      } catch (ServiceDiscoveryException ex) {
+        if (dnsResolver != null) {
+          dnsResolver.close();
+          throw new RuntimeException("Could not initialize Service Discovery client", ex);
+        }
+      }
+    }
+  }
+
   private String resolveLocationURI(String locationURI) throws MetaException {
-    if (!conf.getBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY,
-        CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_ENABLED)) {
+    // We are not configured to run with service discovery
+    if (serviceDiscoveryClient == null) {
       return locationURI;
     }
+
     URI uri = URI.create(locationURI);
     if (Strings.isNullOrEmpty(uri.getHost())) {
       return locationURI;
@@ -11819,15 +11849,8 @@ public class ObjectStore implements RawStore, Configurable {
     if (InetAddresses.isInetAddress(uri.getHost())) {
       return locationURI;
     }
-    ServiceDiscoveryClient client = null;
     try {
-      Builder sdBuilder = new Builder(com.logicalclocks.servicediscoverclient.resolvers.Type.DNS)
-          .withDnsHost(conf.get(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_HOST,
-              CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_HOST))
-          .withDnsPort(conf.getInt(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_PORT,
-              CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_PORT));
-      client = ServiceDiscoveryClientFactory.getInstance().getClient(sdBuilder);
-      Optional<Service> nn = client.getService(ServiceQuery.of(uri.getHost(), Collections.emptySet()))
+      Optional<Service> nn = serviceDiscoveryClient.getService(ServiceQuery.of(uri.getHost(), Collections.emptySet()))
           .findAny();
       if (!nn.isPresent()) {
         throw new MetaException("Service Discovery is enabled but could not resolve domain " + uri.getHost());
@@ -11838,10 +11861,6 @@ public class ObjectStore implements RawStore, Configurable {
       String msg = "Could not resolve NameNode service with Service Discovery";
       LOG.warn(msg, ex);
       throw new MetaException(ex.getMessage() != null ? ex.getMessage() : msg);
-    } finally {
-      if (client != null) {
-        client.close();
-      }
     }
   }
 }
