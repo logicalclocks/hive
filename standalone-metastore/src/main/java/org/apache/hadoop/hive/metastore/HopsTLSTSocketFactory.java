@@ -19,9 +19,8 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
-import org.apache.hadoop.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TTransportException;
@@ -60,8 +59,9 @@ public class HopsTLSTSocketFactory {
             ctx = SSLContext.getInstance("TLS");
 
             // Create reloadable keyManagers/trustManagers
-            KeyStoresFactory keyStoresFactory = new FileBasedKeyStoresFactory();
+            HopsFileBasedKeyStoresFactory keyStoresFactory = new HopsFileBasedKeyStoresFactory();
             keyStoresFactory.setConf(conf);
+            keyStoresFactory.setSystemConf(conf);
             //TODO (Fabio) look into here
             keyStoresFactory.init(SSLFactory.Mode.SERVER);
             ctx.init(keyStoresFactory.getKeyManagers(), keyStoresFactory.getTrustManagers(), null);

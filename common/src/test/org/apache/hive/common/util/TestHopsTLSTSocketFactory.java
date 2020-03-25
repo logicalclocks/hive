@@ -19,11 +19,15 @@
 
 package org.apache.hive.common.util;
 
-import org.apache.hadoop.conf.Configuration;
+import io.hops.security.SuperuserKeystoresLoader;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.common.auth.HiveAuthUtils;
 import org.apache.hadoop.hive.common.auth.TServerSocketFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.ProxyUsers;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.thrift.TException;
@@ -36,11 +40,7 @@ import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 import org.apache.thrift.transport.TTransportFactory;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.ExpectedException;
 
 import javax.net.ssl.SSLSocket;
@@ -56,12 +56,17 @@ import static org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory.SSL_TRUST
 import static org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory.resolvePropertyName;
 
 public class TestHopsTLSTSocketFactory {
+  private static final String BASE_DIR = Paths.get(System.getProperty("test.build.dir",
+          Paths.get("target", "test-dir").toString()),
+          TestHopsTLSTSocketFactory.class.getName()).toString();
+  private static final File BASE_DIR_FILE = new File(BASE_DIR);
+  private static final File SUPER_MATERIAL_DIR = Paths.get(BASE_DIR, "super").toFile();
+
   private Thread serverThread;
   private TThreadPoolServer server;
+  private HiveConf hiveConf;
 
-  private Path serverKeyStore, serverTrustStore;
   private Path clientKeyStore, clientTrustStore;
-  private String outputDir;
   private String password = "11111";
   private KeyPair caKeyPair = null;
   private java.security.cert.X509Certificate caCert;
@@ -86,31 +91,38 @@ public class TestHopsTLSTSocketFactory {
     }
   }
 
+  @BeforeClass
+  public static void beforeClass() {
+    SUPER_MATERIAL_DIR.mkdirs();
+  }
+
+  @AfterClass
+  public static void afterClass() throws Exception {
+    if (BASE_DIR_FILE.exists()) {
+      FileUtils.deleteDirectory(BASE_DIR_FILE);
+    }
+  }
+
   @Before
   public void startServer() throws Exception {
-    outputDir = KeyStoreTestUtil.getClasspathDir(TestHopsTLSTSocketFactory.class);
-
     // Generate CA
     caKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
     caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg);
 
-    generateServerCerts("first");
-    generateClientCerts();
-
+    hiveConf = new HiveConf();
     // Configure TLS
-    Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(serverKeyStore.toString(),
-        password, password, serverTrustStore.toString(), password, "");
-    Path sslServerPath = Paths.get(outputDir, "ssl-server.xml");
-    File sslServer = new File(sslServerPath.toUri());
-    KeyStoreTestUtil.saveConfig(sslServer, sslServerConf);
-
-    HiveConf hiveConf = new HiveConf();
+    hiveConf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, SUPER_MATERIAL_DIR.getAbsolutePath());
     hiveConf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
-    hiveConf.addResource("ssl-server.xml");
     hiveConf.setLong(resolvePropertyName(SSLFactory.Mode.SERVER, SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY), 1000);
     hiveConf.setLong(resolvePropertyName(SSLFactory.Mode.SERVER, SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY), 1000);
     hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1,TLSv1");
     hiveConf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
+    hiveConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_EXCLUDE_CIPHER_LIST), "");
+
+    generateServerCerts("first");
+    generateClientCerts();
+
 
     TServerSocket serverSocket = TServerSocketFactory.
         getServerSocket(hiveConf, TServerSocketFactory.TSocketType.TWOWAYTLS,null, 3245);
@@ -189,18 +201,24 @@ public class TestHopsTLSTSocketFactory {
   }
 
   private void generateServerCerts(String cn) throws Exception {
-    // Generate server certificate signed by CA
+    UserGroupInformation currentUGI = UserGroupInformation.getCurrentUser();
+    hiveConf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + currentUGI.getUserName(), "*");
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(hiveConf);
+    Path serverKeystore = Paths.get(SUPER_MATERIAL_DIR.getAbsolutePath(),
+            loader.getSuperKeystoreFilename(currentUGI.getUserName()));
+    Path serverTruststore = Paths.get(SUPER_MATERIAL_DIR.getAbsolutePath(),
+            loader.getSuperTruststoreFilename(currentUGI.getUserName()));
+    Path serverPasswd = Paths.get(SUPER_MATERIAL_DIR.getAbsolutePath(),
+            loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+
     KeyPair serverKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
     java.security.cert.X509Certificate serverCrt = KeyStoreTestUtil.generateSignedCertificate("CN=" + cn,
-        serverKeyPair, 42, signAlg, caKeyPair.getPrivate(), caCert);
-
-    serverKeyStore = Paths.get(outputDir, "server.keystore.jks");
-    serverTrustStore = Paths.get(outputDir, "server.truststore.jks");
-    KeyStoreTestUtil.createKeyStore(serverKeyStore.toString(), password, password,
+            serverKeyPair, 42, signAlg, caKeyPair.getPrivate(), caCert);
+    KeyStoreTestUtil.createKeyStore(serverKeystore.toString(), password, password,
             "server_alias", serverKeyPair.getPrivate(), serverCrt);
-    KeyStoreTestUtil.createTrustStore(serverTrustStore.toString(), password, "CARoot", caCert);
+    KeyStoreTestUtil.createTrustStore(serverTruststore.toString(), password, "CARoot", caCert);
+    FileUtils.writeStringToFile(serverPasswd.toFile(), password);
   }
-
 
   private void generateClientCerts() throws Exception {
     // Generate server certificate signed by CA
@@ -208,8 +226,8 @@ public class TestHopsTLSTSocketFactory {
     java.security.cert.X509Certificate clientCrt = KeyStoreTestUtil.generateSignedCertificate("CN=client" ,
         clientKeyPair, 42, signAlg, caKeyPair.getPrivate(), caCert);
 
-    clientKeyStore = Paths.get(outputDir, "client.keystore.jks");
-    clientTrustStore= Paths.get(outputDir, "client.truststore.jks");
+    clientKeyStore = Paths.get(BASE_DIR, "client.keystore.jks");
+    clientTrustStore= Paths.get(BASE_DIR, "client.truststore.jks");
     KeyStoreTestUtil.createKeyStore(clientKeyStore.toString(), password, password,
             "client_alias", clientKeyPair.getPrivate(), clientCrt);
     KeyStoreTestUtil.createTrustStore(clientTrustStore.toString(), password, "CARoot", caCert);

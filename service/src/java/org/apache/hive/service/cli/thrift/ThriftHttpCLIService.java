@@ -27,17 +27,16 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.ws.rs.HttpMethod;
 
+import io.hops.security.HopsUtil;
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.common.metrics.common.Metrics;
 import org.apache.hadoop.hive.common.metrics.common.MetricsConstant;
 import org.apache.hadoop.hive.common.metrics.common.MetricsFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
-import org.apache.hadoop.security.ssl.SSLFactory;
-import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.CLIService;
 import org.apache.hive.service.rpc.thrift.TCLIService;
@@ -107,24 +106,10 @@ public class ThriftHttpCLIService extends ThriftCLIService {
 
       // Change connector if SSL is used
       if (useSsl) {
-        String keyStorePath = hiveConf.get(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY)).trim();
-        String trustStorePath = hiveConf.get(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY)).trim();
-        if (keyStorePath == null) {
-          throw new IllegalArgumentException(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-              FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY) + " Not configured for SSL connection");
-        }
-        if (trustStorePath == null) {
-          throw new IllegalArgumentException(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-              FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY) + " Not configured for SSL connection");
-        }
-        String keyStorePassword = ShimLoader.getHadoopShims().getPassword(hiveConf,
-            FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-                FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
-        String trustStorePassword = ShimLoader.getHadoopShims().getPassword(hiveConf,
-            FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-                FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
+        SuperuserKeystoresLoader keystoresLoader = new SuperuserKeystoresLoader(hiveConf);
+        X509SecurityMaterial x509SecurityMaterial = keystoresLoader.loadSuperUserMaterial();
+        String keystoresPassword = HopsUtil.readCryptoMaterialPassword(
+                x509SecurityMaterial.getPasswdLocation().toFile());
 
         SslContextFactory sslContextFactory = new SslContextFactory();
         String[] excludedProtocols = hiveConf.getVar(ConfVars.HIVE_HTTPS_SSL_PROTOCOL_BLACKLIST).split(",");
@@ -132,14 +117,12 @@ public class ThriftHttpCLIService extends ThriftCLIService {
         sslContextFactory.addExcludeProtocols(excludedProtocols);
         LOG.info("HTTP Server SSL: SslContextFactory.getExcludeProtocols = " +
           Arrays.toString(sslContextFactory.getExcludeProtocols()));
-        sslContextFactory.setKeyStorePath(keyStorePath);
-        sslContextFactory.setKeyStorePassword(keyStorePassword);
+        sslContextFactory.setKeyStorePath(x509SecurityMaterial.getKeyStoreLocation().toString());
+        sslContextFactory.setKeyStorePassword(keystoresPassword);
 
-        if (!trustStorePath.isEmpty()) {
-          sslContextFactory.setNeedClientAuth(true);
-          sslContextFactory.setTrustStorePath(trustStorePath);
-          sslContextFactory.setTrustStorePassword(trustStorePassword);
-        }
+        sslContextFactory.setNeedClientAuth(true);
+        sslContextFactory.setTrustStorePath(x509SecurityMaterial.getTrustStoreLocation().toString());
+        sslContextFactory.setTrustStorePassword(keystoresPassword);
 
         connector = new ServerConnector(httpServer, sslContextFactory, http);
       } else {
