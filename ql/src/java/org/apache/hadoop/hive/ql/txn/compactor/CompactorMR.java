@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.StringableMap;
@@ -1207,7 +1208,8 @@ public class CompactorMR {
         Path newDeltaDir = AcidUtils.createFilename(finalLocation, options).getParent();
         LOG.info(context.getJobID() + ": " + tmpLocation +
             " not found.  Assuming 0 splits.  Creating " + newDeltaDir);
-        fs.mkdirs(newDeltaDir);
+        FileUtils.mkdir(fs, newDeltaDir,
+            HiveConf.getBoolVar(conf, ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS), conf);
         createCompactorMarker(conf, newDeltaDir, fs);
         AcidUtils.OrcAcidVersion.writeVersionFile(newDeltaDir, fs);
         return;

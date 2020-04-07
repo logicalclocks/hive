@@ -77,7 +77,7 @@ public class PathInfo {
 
         LOG.debug("Created staging dir = " + dir + " for path = " + inputPath);
 
-        if (!FileUtils.mkdir(fileSystem, dir, hiveConf)) {
+        if (!FileUtils.mkdir(fileSystem, dir, false, hiveConf)) {
           throw new IllegalStateException(
               "Cannot create staging directory  '" + dir.toString() + "'");
         }

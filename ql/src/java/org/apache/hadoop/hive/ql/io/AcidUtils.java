@@ -269,6 +269,7 @@ public class AcidUtils {
    * @param options the options for writing the bucket
    * @return the filename that should store the bucket
    */
+  // TODO: can HDFS create directories when PhysicalFsWriter/updater call fs.create?
   public static Path createFilename(Path directory,
                                     AcidOutputFormat.Options options) {
     String subdir;

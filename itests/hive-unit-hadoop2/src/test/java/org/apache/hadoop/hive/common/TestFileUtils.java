@@ -59,7 +59,7 @@ public class TestFileUtils {
     try {
       fs.create(new Path(basePath, new Path(copySrc, file1Name))).close();
       Assert.assertTrue("FileUtils.copy failed to copy data",
-              FileUtils.copy(fs, copySrc, fs, copyDst, false, false, conf));
+              FileUtils.copy(fs, copySrc, fs, copyDst, false, false, conf, false));
 
       Path dstFileName1 = new Path(copyDst, file1Name);
       Assert.assertTrue(fs.exists(new Path(copyDst, file1Name)));
@@ -94,7 +94,7 @@ public class TestFileUtils {
       conf.set(HiveConf.ConfVars.HIVE_EXEC_COPYFILE_MAXNUMFILES.varname, "1");
       conf.set(HiveConf.ConfVars.HIVE_EXEC_COPYFILE_MAXSIZE.varname, "1");
       Assert.assertTrue("FileUtils.copy failed to copy data",
-              FileUtils.copy(fs, copySrc, fs, copyDst, false, false, conf));
+              FileUtils.copy(fs, copySrc, fs, copyDst, false, false, conf, false));
 
       Path dstFileName1 = new Path(copyDst, file1Name);
       Assert.assertTrue(fs.exists(new Path(copyDst, file1Name)));

@@ -4278,7 +4278,8 @@ public final class Utilities {
     AcidUtils.IdPathFilter filter = new AcidUtils.IdPathFilter(writeId, stmtId);
     if (isMmCtas && !fs.exists(specPath)) {
       Utilities.FILE_OP_LOGGER.info("Creating table directory for CTAS with no output at {}", specPath);
-      FileUtils.mkdir(fs, specPath, hconf);
+      FileUtils.mkdir(fs, specPath,
+          HiveConf.getBoolVar(hconf, ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS), hconf);
     }
     Path[] files = getMmDirectoryCandidates(
         fs, specPath, dpLevels, filter, writeId, stmtId, hconf, isInsertOverwrite);

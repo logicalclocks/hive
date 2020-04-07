@@ -1744,7 +1744,8 @@ public class Hive {
               ? AcidUtils.baseDir(writeId) : AcidUtils.deltaSubdir(writeId, writeId, stmtId));
         }
         if (!isAcidIUDoperation && isFullAcidTable) {
-          destPath = fixFullAcidPathForLoadData(loadFileType, destPath, writeId, stmtId, tbl);
+          destPath = fixFullAcidPathForLoadData(loadFileType, destPath, writeId, stmtId, tbl,
+              HiveConf.getBoolVar(conf, ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS));
         }
         if (Utilities.FILE_OP_LOGGER.isTraceEnabled()) {
           Utilities.FILE_OP_LOGGER.trace("moving " + loadPath + " to " + destPath);
@@ -1871,7 +1872,8 @@ public class Hive {
    * @param stmtId - see {@link DbTxnManager#getStmtIdAndIncrement()}
    * @return appropriately modified path
    */
-  private Path fixFullAcidPathForLoadData(LoadFileType loadFileType, Path destPath, long writeId, int stmtId, Table tbl) throws HiveException {
+  private Path fixFullAcidPathForLoadData(LoadFileType loadFileType, Path destPath, long writeId,
+                                          int stmtId, Table tbl, boolean inheritPerms) throws HiveException {
     switch (loadFileType) {
       case REPLACE_ALL:
         destPath = new Path(destPath, AcidUtils.baseDir(writeId));
@@ -1886,7 +1888,7 @@ public class Hive {
     }
     try {
       FileSystem fs = tbl.getDataLocation().getFileSystem(SessionState.getSessionConf());
-      if(!FileUtils.mkdir(fs, destPath, conf)) {
+      if (!FileUtils.mkdir(fs, destPath, inheritPerms, conf)) {
         LOG.warn(destPath + " already exists?!?!");
       }
     } catch (IOException e) {
@@ -2314,7 +2316,8 @@ private void constructOneLBLocationMap(FileStatus fSta,
             ? AcidUtils.baseDir(writeId) : AcidUtils.deltaSubdir(writeId, writeId, stmtId));
       }
       if (!isAcidIUDoperation && isFullAcidTable) {
-        destPath = fixFullAcidPathForLoadData(loadFileType, destPath, writeId, stmtId, tbl);
+        destPath = fixFullAcidPathForLoadData(loadFileType, destPath, writeId, stmtId, tbl,
+            HiveConf.getBoolVar(conf, ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS));
       }
       Utilities.FILE_OP_LOGGER.debug("moving " + loadPath + " to " + tblPath
           + " (replace = " + loadFileType + ")");
@@ -3276,8 +3279,8 @@ private void constructOneLBLocationMap(FileStatus fSta,
 
   private static void copyFiles(final HiveConf conf, final FileSystem destFs,
             FileStatus[] srcs, final FileSystem srcFs, final Path destf,
-            final boolean isSrcLocal, boolean isOverwrite,
-            final List<Path> newFiles, boolean acidRename) throws HiveException {
+            final boolean isSrcLocal, boolean isOverwrite, final List<Path> newFiles,
+            boolean acidRename, boolean inheritPerms) throws HiveException {
 
     final HdfsUtils.HadoopFileStatus fullDestStatus;
     try {
@@ -3320,6 +3323,11 @@ private void constructOneLBLocationMap(FileStatus fSta,
         final boolean needToCopy = needToCopy(srcP, destf, srcFs, destFs);
 
         final boolean isRenameAllowed = !needToCopy && !isSrcLocal;
+        // If we do a rename for a non-local file, we will be transfering the original
+        // file permissions from source to the destination. Else, in case of mvFile() where we
+        // copy from source to destination, we will inherit the destination's parent group ownership.
+        final String srcGroup = isRenameAllowed ? srcFile.getGroup() :
+          fullDestStatus.getFileStatus().getGroup();
 
         final String msg = "Unable to move source " + srcP + " to destination " + destf;
 
@@ -3328,8 +3336,11 @@ private void constructOneLBLocationMap(FileStatus fSta,
         // copy from source to destination, we will inherit the destination's parent group ownership.
         if (null == pool) {
           try {
-            Path destPath = mvFile(conf, srcFs, srcP, destFs, destf, isSrcLocal, isOverwrite, isRenameAllowed,
-                    acidRename ? taskId++ : -1);
+            Path destPath = mvFile(conf, srcFs, srcP, destFs, destf, isSrcLocal, isOverwrite,
+                isRenameAllowed, acidRename ? taskId++ : -1, inheritPerms);
+            if (inheritPerms) {
+              HdfsUtils.setFullFileStatus(conf, fullDestStatus, destFs, destPath, false);
+            }
 
             if (null != newFiles) {
               newFiles.add(destPath);
@@ -3346,8 +3357,11 @@ private void constructOneLBLocationMap(FileStatus fSta,
               SessionState.setCurrentSessionState(parentSession);
 
               try {
-                Path destPath =
-                    mvFile(conf, srcFs, srcP, destFs, destf, isSrcLocal, isOverwrite, isRenameAllowed, finalTaskId);
+                Path destPath = mvFile(conf, srcFs, srcP, destFs, destf, isSrcLocal, isOverwrite,
+                    isRenameAllowed, finalTaskId, inheritPerms);
+                if (inheritPerms) {
+                  HdfsUtils.setFullFileStatus(conf, fullDestStatus, srcGroup, destFs, destPath, false);
+                }
 
                 if (null != newFiles) {
                   newFiles.add(destPath);
@@ -3361,7 +3375,11 @@ private void constructOneLBLocationMap(FileStatus fSta,
         }
       }
     }
-    if (null != pool) {
+    if (null == pool) {
+      if (inheritPerms) {
+        HdfsUtils.setFullFileStatus(conf, fullDestStatus, null, destFs, destf, true);
+      }
+    } else {
       pool.shutdown();
       for (Future<ObjectPair<Path, Path>> future : futures) {
         try {
@@ -3442,14 +3460,15 @@ private void constructOneLBLocationMap(FileStatus fSta,
    * @param isSrcLocal if the source file is on the local filesystem
    * @param isOverwrite if true, then overwrite destination file if exist else make a duplicate copy
    * @param isRenameAllowed true if the data should be renamed and not copied, false otherwise
+   * @param inheritPerms 
    *
    * @return the {@link Path} the source file was moved to
    *
    * @throws IOException if there was an issue moving the file
    */
-  private static Path mvFile(HiveConf conf, FileSystem sourceFs, Path sourcePath, FileSystem destFs, Path destDirPath,
-                             boolean isSrcLocal, boolean isOverwrite, boolean isRenameAllowed,
-                             int taskId) throws IOException {
+  private static Path mvFile(HiveConf conf, FileSystem sourceFs, Path sourcePath, FileSystem destFs,
+      Path destDirPath, boolean isSrcLocal, boolean isOverwrite, boolean isRenameAllowed,
+      int taskId, boolean inheritPerms) throws IOException {
 
     // Strip off the file type, if any so we don't make:
     // 000000_0.gz -> 000000_0.gz_copy_1
@@ -3490,7 +3509,7 @@ private void constructOneLBLocationMap(FileStatus fSta,
       FileUtils.copy(sourceFs, sourcePath, destFs, destFilePath,
           true,   // delete source
           false,  // overwrite destination
-          conf);
+          conf, inheritPerms);
     }
     return destFilePath;
   }
@@ -3559,7 +3578,7 @@ private void constructOneLBLocationMap(FileStatus fSta,
   //from mv command if the destf is a directory, it replaces the destf instead of moving under
   //the destf. in this case, the replaced destf still preserves the original destf's permission
   public static boolean moveFile(final HiveConf conf, Path srcf, final Path destf, boolean replace,
-                                 boolean isSrcLocal) throws HiveException {
+                                 boolean isSrcLocal, boolean inheritPerms) throws HiveException {
     final FileSystem srcFs, destFs;
     try {
       destFs = destf.getFileSystem(conf);
@@ -3586,7 +3605,7 @@ private void constructOneLBLocationMap(FileStatus fSta,
         destIsSubDirOfSrc = isSubDir(destf, srcf, destFs, srcFs, false);
     final String msg = "Unable to move source " + srcf + " to destination " + destf;
     try {
-      if (replace) {
+      if (replace || inheritPerms) {
         try{
           destStatus = new HdfsUtils.HadoopFileStatus(conf, destFs, destf);
           //if destf is an existing directory:
@@ -3599,6 +3618,10 @@ private void constructOneLBLocationMap(FileStatus fSta,
             LOG.debug("The path " + destf.toString() + " is deleted");
           }
         } catch (FileNotFoundException ignore) {
+          //if dest dir does not exist, any re
+          if (inheritPerms) {
+            destStatus = new HdfsUtils.HadoopFileStatus(conf, destFs, destf.getParent());
+          }
         }
       }
       final HdfsUtils.HadoopFileStatus desiredStatus = destStatus;
@@ -3606,6 +3629,9 @@ private void constructOneLBLocationMap(FileStatus fSta,
       if (isSrcLocal) {
         // For local src file, copy to hdfs
         destFs.copyFromLocalFile(srcf, destf);
+        if (inheritPerms) {
+          HdfsUtils.setFullFileStatus(conf, destStatus, destFs, destf, true);
+        }
         return true;
       } else {
         if (needToCopy(srcf, destf, srcFs, destFs)) {
@@ -3614,24 +3640,24 @@ private void constructOneLBLocationMap(FileStatus fSta,
           return FileUtils.copy(srcf.getFileSystem(conf), srcf, destf.getFileSystem(conf), destf,
               true,    // delete source
               replace, // overwrite destination
-              conf);
+              conf, inheritPerms);
         } else {
           if (srcIsSubDirOfDest || destIsSubDirOfSrc) {
             FileStatus[] srcs = destFs.listStatus(srcf, FileUtils.HIDDEN_FILES_PATH_FILTER);
 
             List<Future<Void>> futures = new LinkedList<>();
-            final ExecutorService pool = conf.getInt(ConfVars.HIVE_MOVE_FILES_THREAD_COUNT.varname, 25) > 0 ?
-                Executors.newFixedThreadPool(conf.getInt(ConfVars.HIVE_MOVE_FILES_THREAD_COUNT.varname, 25),
-                new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Move-Thread-%d").build()) : null;
+            int threadCount = HiveConf.getIntVar(conf, ConfVars.HIVE_MOVE_FILES_THREAD_COUNT);
+            final ExecutorService pool = threadCount <= 0 ? null : Executors.newFixedThreadPool(
+                threadCount, new ThreadFactoryBuilder().setDaemon(true).setNameFormat(
+                    "Move-Thread-%d").build());
             if (destIsSubDirOfSrc && !destFs.exists(destf)) {
               if (Utilities.FILE_OP_LOGGER.isTraceEnabled()) {
                 Utilities.FILE_OP_LOGGER.trace("Creating " + destf);
               }
-              destFs.mkdirs(destf);
+              FileUtils.mkdir(destFs, destf, inheritPerms, conf);
             }
             /* Move files one by one because source is a subdirectory of destination */
             for (final FileStatus srcStatus : srcs) {
-
               final Path destFile = new Path(destf, srcStatus.getPath().getName());
 
               final String poolMsg =
@@ -3640,7 +3666,8 @@ private void constructOneLBLocationMap(FileStatus fSta,
               if (null == pool) {
                 boolean success = false;
                 if (destFs instanceof DistributedFileSystem) {
-                  ((DistributedFileSystem)destFs).rename(srcStatus.getPath(), destFile, Options.Rename.OVERWRITE);
+                  ((DistributedFileSystem)destFs).rename(
+                      srcStatus.getPath(), destFile, Options.Rename.OVERWRITE);
                   success = true;
                 } else {
                   destFs.delete(destFile, false);
@@ -3659,7 +3686,8 @@ private void constructOneLBLocationMap(FileStatus fSta,
                     try {
                       boolean success = false;
                       if (destFs instanceof DistributedFileSystem) {
-                        ((DistributedFileSystem)destFs).rename(srcStatus.getPath(), destFile, Options.Rename.OVERWRITE);
+                        ((DistributedFileSystem)destFs).rename(
+                            srcStatus.getPath(), destFile, Options.Rename.OVERWRITE);
                         success = true;
                       } else {
                         destFs.delete(destFile, false);
@@ -3688,9 +3716,15 @@ private void constructOneLBLocationMap(FileStatus fSta,
                 }
               }
             }
+            if (inheritPerms) {
+              HdfsUtils.setFullFileStatus(conf, desiredStatus, null, destFs, destf, true);
+            }
             return true;
           } else {
             if (destFs.rename(srcf, destf)) {
+              if (inheritPerms) {
+                HdfsUtils.setFullFileStatus(conf, destStatus, destFs, destf, true);
+              }
               return true;
             }
             return false;
@@ -3794,10 +3828,13 @@ private void constructOneLBLocationMap(FileStatus fSta,
                                   boolean isSrcLocal, boolean isAcidIUD,
                                   boolean isOverwrite, List<Path> newFiles, boolean isBucketed,
                                   boolean isFullAcidTable) throws HiveException {
+    boolean inheritPerms = HiveConf.getBoolVar(conf,
+        HiveConf.ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS);
+
     try {
       // create the destination if it does not exist
       if (!fs.exists(destf)) {
-        FileUtils.mkdir(fs, destf, conf);
+        FileUtils.mkdir(fs, destf, inheritPerms, conf);
       }
     } catch (IOException e) {
       throw new HiveException(
@@ -3823,18 +3860,18 @@ private void constructOneLBLocationMap(FileStatus fSta,
     // If we're moving files around for an ACID write then the rules and paths are all different.
     // You can blame this on Owen.
     if (isAcidIUD) {
-      moveAcidFiles(srcFs, srcs, destf, newFiles);
+      moveAcidFiles(srcFs, srcs, destf, newFiles, inheritPerms, conf);
     } else {
       // For ACID non-bucketed case, the filenames have to be in the format consistent with INSERT/UPDATE/DELETE Ops,
       // i.e, like 000000_0, 000001_0_copy_1, 000002_0.gz etc.
       // The extension is only maintained for files which are compressed.
       copyFiles(conf, fs, srcs, srcFs, destf, isSrcLocal, isOverwrite,
-              newFiles, isFullAcidTable && !isBucketed);
+              newFiles, isFullAcidTable && !isBucketed, inheritPerms);
     }
   }
 
   public static void moveAcidFiles(FileSystem fs, FileStatus[] stats, Path dst,
-                                    List<Path> newFiles) throws HiveException {
+      List<Path> newFiles, boolean inheritPerms, Configuration conf) throws HiveException {
     // The layout for ACID files is table|partname/base|delta|delete_delta/bucket
     // We will always only be writing delta files ( except IOW which writes base_X/ ).
     // In the buckets created by FileSinkOperator
@@ -3895,18 +3932,18 @@ private void constructOneLBLocationMap(FileStatus fSta,
       for (FileStatus origBucketStat : origBucketStats) {
         Path origBucketPath = origBucketStat.getPath();
         moveAcidFiles(AcidUtils.DELTA_PREFIX, AcidUtils.deltaFileFilter,
-                fs, dst, origBucketPath, createdDeltaDirs, newFiles);
+                fs, dst, origBucketPath, createdDeltaDirs, newFiles, inheritPerms, conf);
         moveAcidFiles(AcidUtils.DELETE_DELTA_PREFIX, AcidUtils.deleteEventDeltaDirFilter,
-                fs, dst,origBucketPath, createdDeltaDirs, newFiles);
+                fs, dst,origBucketPath, createdDeltaDirs, newFiles, inheritPerms, conf);
         moveAcidFiles(AcidUtils.BASE_PREFIX, AcidUtils.baseFileFilter,//for Insert Overwrite
-                fs, dst, origBucketPath, createdDeltaDirs, newFiles);
+                fs, dst, origBucketPath, createdDeltaDirs, newFiles, inheritPerms, conf);
       }
     }
   }
 
   private static void moveAcidFiles(String deltaFileType, PathFilter pathFilter, FileSystem fs,
-                                    Path dst, Path origBucketPath, Set<Path> createdDeltaDirs,
-                                    List<Path> newFiles) throws HiveException {
+      Path dst, Path origBucketPath, Set<Path> createdDeltaDirs,
+      List<Path> newFiles, boolean inheritPerms, Configuration conf) throws HiveException {
     LOG.debug("Acid move looking for " + deltaFileType + " files in bucket " + origBucketPath);
 
     FileStatus[] deltaStats = null;
@@ -3928,7 +3965,7 @@ private void constructOneLBLocationMap(FileStatus fSta,
       try {
         if (!createdDeltaDirs.contains(deltaDest)) {
           try {
-            if(fs.mkdirs(deltaDest)) {
+            if(FileUtils.mkdir(fs, deltaDest, inheritPerms, conf)) {
               fs.rename(AcidUtils.OrcAcidVersion.getVersionFilePath(deltaStat.getPath()),
                   AcidUtils.OrcAcidVersion.getVersionFilePath(deltaDest));
             }
@@ -4011,8 +4048,10 @@ private void constructOneLBLocationMap(FileStatus fSta,
       }
 
       // first call FileUtils.mkdir to make sure that destf directory exists, if not, it creates
-      // destf
-      boolean destfExist = FileUtils.mkdir(destFs, destf, conf);
+      // destf with inherited permissions
+      boolean inheritPerms = HiveConf.getBoolVar(conf, HiveConf.ConfVars
+          .HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS);
+      boolean destfExist = FileUtils.mkdir(destFs, destf, inheritPerms, conf);
       if(!destfExist) {
         throw new IOException("Directory " + destf.toString()
             + " does not exist and could not be created.");
@@ -4025,7 +4064,7 @@ private void constructOneLBLocationMap(FileStatus fSta,
       // 2. srcs must be a list of files -- ensured by LoadSemanticAnalyzer
       // in both cases, we move the file under destf
       if (srcs.length == 1 && srcs[0].isDirectory()) {
-        if (!moveFile(conf, srcs[0].getPath(), destf, true, isSrcLocal)) {
+        if (!moveFile(conf, srcs[0].getPath(), destf, true, isSrcLocal, inheritPerms)) {
           throw new IOException("Error moving: " + srcf + " into: " + destf);
         }
 
@@ -4037,7 +4076,7 @@ private void constructOneLBLocationMap(FileStatus fSta,
         // its either a file or glob
         for (FileStatus src : srcs) {
           Path destFile = new Path(destf, src.getPath().getName());
-          if (!moveFile(conf, src.getPath(), destFile, true, isSrcLocal)) {
+          if (!moveFile(conf, src.getPath(), destFile, true, isSrcLocal, inheritPerms)) {
             throw new IOException("Error moving: " + srcf + " into: " + destf);
           }
 
