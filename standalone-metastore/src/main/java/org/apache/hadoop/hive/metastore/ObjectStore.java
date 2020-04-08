@@ -1009,13 +1009,15 @@ public class ObjectStore implements RawStore, Configurable {
 
   @Override
   public Database getDatabase(String catalogName, String name) throws NoSuchObjectException {
+    return getDatabase(catalogName, name, true);
+  }
+
+  @Override
+  public Database getDatabase(String catalogName, String name, boolean resolveHostname) throws NoSuchObjectException {
     MetaException ex = null;
     Database db = null;
     try {
-      db = getDatabaseInternal(catalogName, name);
-      if (db != null) {
-        db.setLocationUri(serviceDiscoveryClient.resolveLocationURI(db.getLocationUri()));
-      }
+      db = getDatabaseInternal(catalogName, name, resolveHostname);
     } catch (MetaException e) {
       // Signature restriction to NSOE, and NSOE being a flat exception prevents us from
       // setting the cause of the NSOE as the MetaException. We should not lose the info
@@ -1031,22 +1033,23 @@ public class ObjectStore implements RawStore, Configurable {
     return db;
   }
 
-  public Database getDatabaseInternal(String catalogName, String name)
+  public Database getDatabaseInternal(String catalogName, String name, boolean resolveHostname)
       throws MetaException, NoSuchObjectException {
     return new GetDbHelper(catalogName, name, true, true) {
       @Override
       protected Database getSqlResult(GetHelper<Database> ctx) throws MetaException {
-        return directSql.getDatabase(catalogName, dbName);
+        return directSql.getDatabase(catalogName, dbName, resolveHostname);
       }
 
       @Override
       protected Database getJdoResult(GetHelper<Database> ctx) throws MetaException, NoSuchObjectException {
-        return getJDODatabase(catalogName, dbName);
+        return getJDODatabase(catalogName, dbName, resolveHostname);
       }
     }.run(false);
    }
 
-  public Database getJDODatabase(String catName, String name) throws NoSuchObjectException {
+  public Database getJDODatabase(String catName, String name, boolean resolveHostname)
+      throws MetaException, NoSuchObjectException {
     MDatabase mdb = null;
     boolean commited = false;
     try {
@@ -1061,7 +1064,11 @@ public class ObjectStore implements RawStore, Configurable {
     Database db = new Database();
     db.setName(mdb.getName());
     db.setDescription(mdb.getDescription());
-    db.setLocationUri(mdb.getSd().getLocation());
+    if (resolveHostname) {
+      db.setLocationUri(serviceDiscoveryClient.resolveLocationURI(mdb.getSd().getLocation()));
+    } else {
+      db.setLocationUri(mdb.getSd().getLocation());
+    }
     db.setParameters(convertMap(mdb.getParameters()));
     db.setOwnerName(mdb.getOwnerName());
     String type = org.apache.commons.lang.StringUtils.defaultIfBlank(mdb.getOwnerType(), null);

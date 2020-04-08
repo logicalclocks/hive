@@ -764,12 +764,17 @@ public class CachedStore implements RawStore, Configurable {
 
   @Override
   public Database getDatabase(String catName, String dbName) throws NoSuchObjectException {
+    return getDatabase(catName, dbName, true);
+  }
+
+  @Override
+  public Database getDatabase(String catName, String dbName, boolean resolveHostname) throws NoSuchObjectException {
     if (!sharedCache.isDatabaseCachePrewarmed()) {
       return rawStore.getDatabase(catName, dbName);
     }
     dbName = dbName.toLowerCase();
     Database db = sharedCache.getDatabaseFromCache(StringUtils.normalizeIdentifier(catName),
-            StringUtils.normalizeIdentifier(dbName));
+        StringUtils.normalizeIdentifier(dbName));
     if (db == null) {
       throw new NoSuchObjectException();
     }

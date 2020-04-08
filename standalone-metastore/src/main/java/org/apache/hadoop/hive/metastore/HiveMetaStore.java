@@ -1796,7 +1796,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
           if (tbl.getSd().getLocation() == null
               || tbl.getSd().getLocation().isEmpty()) {
             tblPath = wh.getDefaultTablePath(
-                ms.getDatabase(tbl.getCatName(), tbl.getDbName()), tbl.getTableName());
+                ms.getDatabase(tbl.getCatName(), tbl.getDbName(), false), tbl.getTableName());
           } else {
             if (!isExternal(tbl) && !MetaStoreUtils.isNonNativeTable(tbl)) {
               LOG.warn("Location: " + tbl.getSd().getLocation()

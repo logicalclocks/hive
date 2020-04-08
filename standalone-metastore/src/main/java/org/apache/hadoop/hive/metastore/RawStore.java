@@ -191,6 +191,18 @@ public interface RawStore extends Configurable {
       throws NoSuchObjectException;
 
   /**
+   * Get a database.
+   * @param catalogName catalog the database is in.
+   * @param name name of the database.
+   * @param resolveHostname true to resolve the internal hostname
+   * @return the database.
+   * @throws NoSuchObjectException if no such database exists.
+   */
+  Database getDatabase(String catalogName, String name, boolean resolveHostname)
+      throws NoSuchObjectException;
+
+
+  /**
    * Drop a database.
    * @param catalogName catalog the database is in.
    * @param dbname name of the database.

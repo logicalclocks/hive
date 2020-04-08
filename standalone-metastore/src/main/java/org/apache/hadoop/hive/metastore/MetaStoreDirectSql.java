@@ -318,7 +318,7 @@ class MetaStoreDirectSql {
     }
   }
 
-  public Database getDatabase(String catName, String dbName) throws MetaException{
+  public Database getDatabase(String catName, String dbName, boolean resolveHostname) throws MetaException{
     Query queryDbSelector = null;
     Query queryDbParams = null;
     try {
@@ -373,7 +373,11 @@ class MetaStoreDirectSql {
       }
       Database db = new Database();
       db.setName(extractSqlString(dbline[1]));
-      db.setLocationUri(serviceDiscoveryClient.resolveLocationURI(extractSqlString(dbline[2])));
+      if (resolveHostname) {
+        db.setLocationUri(serviceDiscoveryClient.resolveLocationURI(extractSqlString(dbline[2])));
+      } else {
+        db.setLocationUri(extractSqlString(dbline[2]));
+      }
       db.setDescription(extractSqlString(dbline[3]));
       db.setOwnerName(extractSqlString(dbline[4]));
       String type = extractSqlString(dbline[5]);
