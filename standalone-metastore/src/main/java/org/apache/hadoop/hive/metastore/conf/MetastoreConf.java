@@ -862,6 +862,10 @@ public class MetastoreConf {
     ENFORCE_WAREHOUSE_AUTHORITY("metastore.warehouse.enforce.authority",
         "hive.metastore.warehouse.enforce.authority", false,
         "Enforce warehouse authority to be the same as the one specified in the metastore.warehouse.dir option"),
+    WAREHOUSE_SUBDIR_INHERIT_PERMS("metastore.warehouse.subdir.inherit.perms",
+        "hive.warehouse.subdir.inherit.perms", false,
+        "Set this to false if the table directories should be created with the permissions derived" +
+            " from dfs umask instead of inheriting the permission of the warehouse or database directory."),
     WRITE_SET_REAPER_INTERVAL("metastore.writeset.reaper.interval",
         "hive.writeset.reaper.interval", 60, TimeUnit.SECONDS,
         "Frequency of WriteSet reaper runs"),

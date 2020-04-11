@@ -32,6 +32,7 @@ import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -160,14 +161,53 @@ public class FileUtils {
    * Creates the directory and all necessary parent directories.
    * @param fs FileSystem to use
    * @param f path to create.
+   * @param inheritPerms
+   * @param conf
    * @return true if directory created successfully.  False otherwise, including if it exists.
    * @throws IOException exception in creating the directory
    */
-  public static boolean mkdir(FileSystem fs, Path f) throws IOException {
+  public static boolean mkdir(FileSystem fs, Path f,
+                              boolean inheritPerms, Configuration conf) throws IOException {
     LOG.info("Creating directory if it doesn't exist: " + f);
-    return fs.mkdirs(f);
+    if (!inheritPerms) {
+      return fs.mkdirs(f);
+    } else  {
+      //Check if the directory already exists. We want to change the permission
+      //to that of the parent directory only for newly created directories.
+      try {
+        return fs.getFileStatus(f).isDir();
+      } catch (FileNotFoundException ignore) {
+      }
+      //inherit perms: need to find last existing parent path, and apply its permission on entire subtree.
+      Path lastExistingParent = f;
+      Path firstNonExistentParent = null;
+      while (!fs.exists(lastExistingParent)) {
+        firstNonExistentParent = lastExistingParent;
+        lastExistingParent = lastExistingParent.getParent();
+      }
+      boolean success = fs.mkdirs(f);
+      if (!success) {
+        return false;
+      } else {
+        //set on the entire subtree
+        if (inheritPerms) {
+          inheritPerms(fs, lastExistingParent, firstNonExistentParent, conf);
+        }
+        return true;
+      }
+    }
   }
 
+  public static void inheritParentPerms(
+      FileSystem dstFS, Path dst, Configuration conf) throws IOException {
+    inheritPerms(dstFS, dst.getParent(), dst, conf);
+  }
+
+  public static void inheritPerms(
+      FileSystem dstFS, Path src, Path dst, Configuration conf) throws IOException {
+    HdfsUtils.setFullFileStatus(
+        conf, new HdfsUtils.HadoopFileStatus(conf, dstFS, src), null, dstFS, dst, true);
+  }
   /**
    * Rename a file.  Unlike {@link FileSystem#rename(Path, Path)}, if the destPath already exists
    * and is a directory, this will NOT move the sourcePath into it.  It will throw an IOException
