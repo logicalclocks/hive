@@ -52,13 +52,13 @@ public class CachedServiceDiscoveryResolver {
       return locationURI;
     }
     try {
-      Optional<Service> nn = client.getService(ServiceQuery.of(uri.getHost(), Collections.emptySet()))
-              .findAny();
-      if (!nn.isPresent()) {
-        throw new MetaException("Service Discovery is enabled but could not resolve domain " + uri.getHost());
-      }
-      return new URI(uri.getScheme(), uri.getUserInfo(), nn.get().getAddress() , uri.getPort(), uri.getPath(),
+      Service nn = client.getService(ServiceQuery.of(uri.getHost(), Collections.emptySet()))
+          .findAny()
+          .orElseThrow(() -> new MetaException("Service Discovery is enabled but could not resolve domain " + uri.getHost()));
+
+      return new URI(uri.getScheme(), uri.getUserInfo(), nn.getAddress(), uri.getPort(), uri.getPath(),
               uri.getQuery(), uri.getFragment()).toString();
+
     } catch (ServiceDiscoveryException | URISyntaxException ex) {
       String msg = "Could not resolve NameNode service with Service Discovery";
       LOG.warn(msg, ex);

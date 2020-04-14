@@ -93,6 +93,11 @@ public class InjectableBehaviourObjectStore extends ObjectStore {
   }
 
   @Override
+  public Table getTable(String catName, String dbName, String tableName, boolean resolveHostname) throws MetaException {
+    return getTableModifier.apply(super.getTable(catName, dbName, tableName, resolveHostname));
+  }
+
+  @Override
   public List<String> listPartitionNames(String catName, String dbName, String tableName, short max) throws MetaException {
     return listPartitionNamesModifier.apply(super.listPartitionNames(catName, dbName, tableName, max));
   }

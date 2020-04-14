@@ -34,10 +34,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -50,7 +48,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -75,13 +72,6 @@ import javax.jdo.identity.IntIdentity;
 import javax.sql.DataSource;
 
 import com.google.common.base.Strings;
-import com.google.common.net.InetAddresses;
-import com.logicalclocks.servicediscoverclient.Builder;
-import com.logicalclocks.servicediscoverclient.ServiceDiscoveryClient;
-import com.logicalclocks.servicediscoverclient.exceptions.ServiceDiscoveryException;
-import com.logicalclocks.servicediscoverclient.service.Service;
-import com.logicalclocks.servicediscoverclient.service.ServiceQuery;
-import io.hops.net.ServiceDiscoveryClientFactory;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -90,7 +80,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.MetaStoreDirectSql.SqlFilterForPushdown;
@@ -313,6 +302,7 @@ public class ObjectStore implements RawStore, Configurable {
   private Pattern partitionValidationPattern;
   private Counter directSqlErrors;
   private CachedServiceDiscoveryResolver serviceDiscoveryClient;
+  private String whAuthority = null;
 
   /**
    * A Autocloseable wrapper around Query class to pass the Query object to the caller and let the caller release
@@ -384,6 +374,11 @@ public class ObjectStore implements RawStore, Configurable {
       transactionStatus = TXN_STATUS.NO_STATE;
 
       serviceDiscoveryClient = new CachedServiceDiscoveryResolver(conf);
+      if (MetastoreConf.getBoolVar(conf, ConfVars.ENFORCE_WAREHOUSE_AUTHORITY)) {
+        URI uri = URI.create(MetastoreConf.getVar(conf, ConfVars.WAREHOUSE));
+        whAuthority = uri.getAuthority();
+      }
+
       initialize(propsFromConf);
 
       String partitionValidationRegex =
@@ -1548,11 +1543,16 @@ public class ObjectStore implements RawStore, Configurable {
 
   @Override
   public Table getTable(String catName, String dbName, String tableName) throws MetaException {
+    return getTable(catName, dbName, tableName, true);
+  }
+
+  @Override
+  public Table getTable(String catName, String dbName, String tableName, boolean resolveHostname) throws MetaException {
     boolean commited = false;
     Table tbl = null;
     try {
       openTransaction();
-      tbl = convertToTable(getMTable(catName, dbName, tableName));
+      tbl = convertToTable(getMTable(catName, dbName, tableName), resolveHostname);
       // Retrieve creation metadata if needed
       if (tbl != null && TableType.MATERIALIZED_VIEW.toString().equals(tbl.getTableType())) {
         tbl.setCreationMetadata(
@@ -1875,7 +1875,6 @@ public class ObjectStore implements RawStore, Configurable {
         lowered_tbl_names.add(normalizeIdentifier(t));
       }
       query = pm.newQuery(MTable.class);
-//<<<<<<< HEAD
       query.setFilter("database.name == db && database.catalogName == cat && tbl_names.contains(tableName)");
       query.declareParameters("java.lang.String db, java.lang.String cat, java.util.Collection tbl_names");
       Collection mtables = (Collection) query.execute(db, catName, lowered_tbl_names);
@@ -1892,7 +1891,7 @@ public class ObjectStore implements RawStore, Configurable {
         }
       } else {
         for (Iterator iter = mtables.iterator(); iter.hasNext(); ) {
-          Table tbl = convertToTable((MTable) iter.next());
+          Table tbl = convertToTable((MTable) iter.next(), true);
           // Retrieve creation metadata if needed
           if (TableType.MATERIALIZED_VIEW.toString().equals(tbl.getTableType())) {
             tbl.setCreationMetadata(
@@ -1923,7 +1922,7 @@ public class ObjectStore implements RawStore, Configurable {
         MetastoreConf.getBoolVar(getConf(), ConfVars.ORM_RETRIEVE_MAPNULLS_AS_EMPTY_STRINGS));
   }
 
-  private Table convertToTable(MTable mtbl) throws MetaException {
+  private Table convertToTable(MTable mtbl, boolean resolveHostname) throws MetaException {
     if (mtbl == null) {
       return null;
     }
@@ -1940,7 +1939,7 @@ public class ObjectStore implements RawStore, Configurable {
     }
     Table t = new Table(mtbl.getTableName(), mtbl.getDatabase().getName(), mtbl
         .getOwner(), mtbl.getCreateTime(), mtbl.getLastAccessTime(), mtbl
-        .getRetention(), convertToStorageDescriptor(mtbl.getSd()),
+        .getRetention(), convertToStorageDescriptor(mtbl.getSd(), resolveHostname),
         convertToFieldSchemas(mtbl.getPartitionKeys()), convertMap(mtbl.getParameters()),
         mtbl.getViewOriginalText(), mtbl.getViewExpandedText(), tableType);
 
@@ -2091,17 +2090,18 @@ public class ObjectStore implements RawStore, Configurable {
   // MSerdeInfo *& SerdeInfo should be same as well
   private StorageDescriptor convertToStorageDescriptor(
       MStorageDescriptor msd,
-      boolean noFS) throws MetaException {
+      boolean noFS, boolean resolveHostname) throws MetaException {
     if (msd == null) {
       return null;
     }
     List<MFieldSchema> mFieldSchemas = msd.getCD() == null ? null : msd.getCD().getCols();
 
     StorageDescriptor sd = new StorageDescriptor(noFS ? null : convertToFieldSchemas(mFieldSchemas),
-        serviceDiscoveryClient.resolveLocationURI(msd.getLocation()), msd.getInputFormat(), msd.getOutputFormat(), msd
-        .isCompressed(), msd.getNumBuckets(), convertToSerDeInfo(msd
-        .getSerDeInfo()), convertList(msd.getBucketCols()), convertToOrders(msd
-        .getSortCols()), convertMap(msd.getParameters()));
+        resolveHostname ? serviceDiscoveryClient.resolveLocationURI(msd.getLocation()) : msd.getLocation(),
+        msd.getInputFormat(), msd.getOutputFormat(), msd.isCompressed(),
+        msd.getNumBuckets(), convertToSerDeInfo(msd.getSerDeInfo()),
+        convertList(msd.getBucketCols()), convertToOrders(msd.getSortCols()),
+        convertMap(msd.getParameters()));
     SkewedInfo skewedInfo = new SkewedInfo(convertList(msd.getSkewedColNames()),
         convertToSkewedValues(msd.getSkewedColValues()),
         covertToSkewedMap(msd.getSkewedColValueLocationMaps()));
@@ -2110,9 +2110,9 @@ public class ObjectStore implements RawStore, Configurable {
     return sd;
   }
 
-  private StorageDescriptor convertToStorageDescriptor(MStorageDescriptor msd)
+  private StorageDescriptor convertToStorageDescriptor(MStorageDescriptor msd, boolean resolveHostname)
       throws MetaException {
-    return convertToStorageDescriptor(msd, false);
+    return convertToStorageDescriptor(msd, false, resolveHostname);
   }
 
   /**
@@ -2207,10 +2207,10 @@ public class ObjectStore implements RawStore, Configurable {
     if (sd == null) {
       return null;
     }
-    return new MStorageDescriptor(mcd, sd.getLocation(),
-        sd.getInputFormat(), sd.getOutputFormat(), sd
-        .isCompressed(), sd.getNumBuckets(), convertToMSerDeInfo(sd
-        .getSerdeInfo()), sd.getBucketCols(),
+    return new MStorageDescriptor(mcd,
+        enforceWhAuthority(sd.getLocation()),
+        sd.getInputFormat(), sd.getOutputFormat(), sd.isCompressed(),
+        sd.getNumBuckets(), convertToMSerDeInfo(sd.getSerdeInfo()), sd.getBucketCols(),
         convertToMOrders(sd.getSortCols()), sd.getParameters(),
         (null == sd.getSkewedInfo()) ? null
             : sd.getSkewedInfo().getSkewedColNames(),
@@ -2219,6 +2219,19 @@ public class ObjectStore implements RawStore, Configurable {
         covertToMapMStringList((null == sd.getSkewedInfo()) ? null : sd.getSkewedInfo()
             .getSkewedColValueLocationMaps()), sd.isStoredAsSubDirectories(),
         null, null, null);
+  }
+
+  private String enforceWhAuthority(String location) throws MetaException {
+    if (!MetastoreConf.getBoolVar(conf, ConfVars.ENFORCE_WAREHOUSE_AUTHORITY)) {
+      return location;
+    }
+
+    URI uri = URI.create(location);
+    try {
+      return new URI(uri.getScheme(), whAuthority, uri.getPath(), uri.getQuery(), uri.getFragment()).toString();
+    } catch (URISyntaxException ex) {
+      throw new MetaException(ex.getMessage());
+    }
   }
 
   private MCreationMetadata convertToMCreationMetadata(
@@ -2546,7 +2559,7 @@ public class ObjectStore implements RawStore, Configurable {
     }
     Partition p = new Partition(convertList(mpart.getValues()), mpart.getTable().getDatabase()
         .getName(), mpart.getTable().getTableName(), mpart.getCreateTime(),
-        mpart.getLastAccessTime(), convertToStorageDescriptor(mpart.getSd()),
+        mpart.getLastAccessTime(), convertToStorageDescriptor(mpart.getSd(), true),
         convertMap(mpart.getParameters()));
     p.setCatName(mpart.getTable().getDatabase().getCatalogName());
     return p;
@@ -3832,7 +3845,7 @@ public class ObjectStore implements RawStore, Configurable {
 
   private Table ensureGetTable(String catName, String dbName, String tblName)
       throws NoSuchObjectException, MetaException {
-    return convertToTable(ensureGetMTable(catName, dbName, tblName));
+    return convertToTable(ensureGetMTable(catName, dbName, tblName), true);
   }
 
   /**
@@ -3849,7 +3862,7 @@ public class ObjectStore implements RawStore, Configurable {
       Map<String, Object> params) throws MetaException {
     ExpressionTree tree = (filter != null && !filter.isEmpty())
         ? PartFilterExprUtil.getFilterParser(filter).tree : ExpressionTree.EMPTY_TREE;
-    return makeQueryFilterString(catName, dbName, convertToTable(mtable), tree, params, true);
+    return makeQueryFilterString(catName, dbName, convertToTable(mtable, true), tree, params, true);
   }
 
   /**

@@ -119,6 +119,7 @@ public class MetastoreConf {
    */
   public static final MetastoreConf.ConfVars[] metaVars = {
       ConfVars.WAREHOUSE,
+      ConfVars.ENFORCE_WAREHOUSE_AUTHORITY,
       ConfVars.REPLDIR,
       ConfVars.THRIFT_URIS,
       ConfVars.SERVER_PORT,
@@ -858,6 +859,9 @@ public class MetastoreConf {
         "validates existing schema against code. turn this on if you want to verify existing schema"),
     WAREHOUSE("metastore.warehouse.dir", "hive.metastore.warehouse.dir", "/user/hive/warehouse",
         "location of default database for the warehouse"),
+    ENFORCE_WAREHOUSE_AUTHORITY("metastore.warehouse.enforce.authority",
+        "hive.metastore.warehouse.enforce.authority", false,
+        "Enforce warehouse authority to be the same as the one specified in the metastore.warehouse.dir option"),
     WRITE_SET_REAPER_INTERVAL("metastore.writeset.reaper.interval",
         "hive.writeset.reaper.interval", 60, TimeUnit.SECONDS,
         "Frequency of WriteSet reaper runs"),

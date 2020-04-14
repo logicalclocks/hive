@@ -3335,7 +3335,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
 
       try {
         ms.openTransaction();
-        tbl = ms.getTable(catName, dbName, tblName);
+        tbl = ms.getTable(catName, dbName, tblName, false);
         if (tbl == null) {
           throw new InvalidObjectException("Unable to add partitions because "
               + getCatalogQualifiedTableName(catName, dbName, tblName) +

@@ -278,6 +278,17 @@ public interface RawStore extends Configurable {
   Table getTable(String catalogName, String dbName, String tableName) throws MetaException;
 
   /**
+   * Get a table object.
+   * @param catalogName catalog the table is in.
+   * @param dbName database the table is in.
+   * @param tableName table name.
+   * @return table object, or null if no such table exists (wow it would be nice if we either
+   * consistently returned null or consistently threw NoSuchObjectException).
+   * @throws MetaException something went wrong in the RDBMS
+   */
+  Table getTable(String catalogName, String dbName, String tableName, boolean resolveHostname) throws MetaException;
+
+  /**
    * Add a partition.
    * @param part partition to add
    * @return true if the partition was successfully added.
