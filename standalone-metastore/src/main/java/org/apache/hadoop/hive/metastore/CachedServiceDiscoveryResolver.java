@@ -11,6 +11,7 @@ import com.logicalclocks.servicediscoverclient.service.ServiceQuery;
 import io.hops.net.ServiceDiscoveryClientFactory;
 import net.spy.memcached.compat.log.Logger;
 import net.spy.memcached.compat.log.LoggerFactory;
+import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -70,17 +71,17 @@ public class CachedServiceDiscoveryResolver {
     if (conf.getBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY,
             CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_ENABLED)) {
       ServiceDiscoveryClient dnsResolver = null;
+      ServiceDiscoveryClientFactory factory = ServiceDiscoveryClientFactory.getInstance();
+      Pair<String, Integer> nameserver = factory.getNameserver(conf);
       try {
         dnsResolver = new Builder(com.logicalclocks.servicediscoverclient.resolvers.Type.DNS)
-                .withDnsHost(conf.get(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_HOST,
-                        CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_HOST))
-                .withDnsPort(conf.getInt(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_DNS_PORT,
-                        CommonConfigurationKeysPublic.DEFAULT_SERVICE_DISCOVERY_DNS_PORT))
+                .withDnsHost(nameserver.getFirst())
+                .withDnsPort(nameserver.getSecond())
                 .build();
         Builder cachedDNSResolver = new Builder(com.logicalclocks.servicediscoverclient.resolvers.Type.CACHING)
                 .withCacheExpiration(Duration.of(30, ChronoUnit.SECONDS))
                 .withServiceDiscoveryClient(dnsResolver);
-        return ServiceDiscoveryClientFactory.getInstance().getClient(cachedDNSResolver);
+        return factory.getClient(cachedDNSResolver);
       } catch (ServiceDiscoveryException ex) {
         if (dnsResolver != null) {
           dnsResolver.close();
