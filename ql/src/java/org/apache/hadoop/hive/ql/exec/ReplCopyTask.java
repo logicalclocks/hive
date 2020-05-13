@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.parse.LoadSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
@@ -67,6 +68,9 @@ public class ReplCopyTask extends Task<ReplCopyWork> implements Serializable {
         throw new RuntimeException("Invalid ReplCopyWork: "
             + work.getFromPaths() + ", " + work.getToPaths());
       }
+
+      boolean inheritPerms = HiveConf.getBoolVar(conf,
+        ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS);
       Path fromPath = work.getFromPaths()[0];
       toPath = work.getToPaths()[0];
 
@@ -86,7 +90,7 @@ public class ReplCopyTask extends Task<ReplCopyWork> implements Serializable {
             .getFileInfo(new Path(result[0]), result[1], result[2], result[3], conf);
         if (FileUtils.copy(
             sourceInfo.getSrcFs(), sourceInfo.getSourcePath(),
-            dstFs, toPath, false, false, conf)) {
+            dstFs, toPath, false, false, conf, inheritPerms)) {
           return 0;
         } else {
           console.printError("Failed to copy: '" + fromPath.toString() + "to: '" + toPath.toString()
@@ -135,7 +139,7 @@ public class ReplCopyTask extends Task<ReplCopyWork> implements Serializable {
       }
 
       LOG.debug("ReplCopyTask numFiles: {}", srcFiles.size());
-      if (!FileUtils.mkdir(dstFs, toPath, conf)) {
+      if (!FileUtils.mkdir(dstFs, toPath, inheritPerms, conf)) {
         console.printError("Cannot make target directory: " + toPath.toString());
         return 2;
       }

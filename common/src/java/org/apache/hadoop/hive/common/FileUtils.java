@@ -52,6 +52,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.io.HdfsUtils;
 import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.shims.Utils;
@@ -567,13 +568,42 @@ public final class FileUtils {
    * Creates the directory and all necessary parent directories.
    * @param fs FileSystem to use
    * @param f path to create.
+   * @param inheritPerms whether directory inherits the permission of the last-existing parent path
    * @param conf Hive configuration
    * @return true if directory created successfully.  False otherwise, including if it exists.
    * @throws IOException exception in creating the directory
    */
-  public static boolean mkdir(FileSystem fs, Path f, Configuration conf) throws IOException {
+  public static boolean mkdir(
+      FileSystem fs, Path f, boolean inheritPerms, Configuration conf) throws IOException {
     LOG.info("Creating directory if it doesn't exist: " + f);
-    return fs.mkdirs(f);
+    if (!inheritPerms) {
+      //just create the directory
+      return fs.mkdirs(f);
+    } else {
+      //Check if the directory already exists. We want to change the permission
+      //to that of the parent directory only for newly created directories.
+      try {
+        return fs.getFileStatus(f).isDir();
+      } catch (FileNotFoundException ignore) {
+      }
+      //inherit perms: need to find last existing parent path, and apply its permission on entire subtree.
+      Path lastExistingParent = f;
+      Path firstNonExistentParent = null;
+      while (!fs.exists(lastExistingParent)) {
+        firstNonExistentParent = lastExistingParent;
+        lastExistingParent = lastExistingParent.getParent();
+      }
+      boolean success = fs.mkdirs(f);
+      if (!success) {
+        return false;
+      } else {
+        //set on the entire subtree
+        if (inheritPerms) {
+          inheritPerms(fs, lastExistingParent, firstNonExistentParent, conf);
+        }
+        return true;
+      }
+    }
   }
 
   public static Path makeAbsolute(FileSystem fileSystem, Path path) throws IOException {
@@ -591,8 +621,9 @@ public final class FileUtils {
       FileSystem dstFS, Path dst,
       boolean deleteSource,
       boolean overwrite,
-      HiveConf conf) throws IOException {
-    return copy(srcFS, src, dstFS, dst, deleteSource, overwrite, conf, ShimLoader.getHadoopShims());
+      HiveConf conf, boolean inheritPerms) throws IOException {
+    return copy(srcFS, src, dstFS, dst, deleteSource, overwrite, conf,
+        ShimLoader.getHadoopShims(), inheritPerms);
   }
 
   @VisibleForTesting
@@ -600,7 +631,7 @@ public final class FileUtils {
     FileSystem dstFS, Path dst,
     boolean deleteSource,
     boolean overwrite,
-    HiveConf conf, HadoopShims shims) throws IOException {
+    HiveConf conf, HadoopShims shims, boolean inheritPerms) throws IOException {
 
     boolean copied = false;
     boolean triedDistcp = false;
@@ -627,7 +658,21 @@ public final class FileUtils {
       // implementation, and fail instead.
       copied = FileUtil.copy(srcFS, src, dstFS, dst, deleteSource, overwrite, conf);
     }
+    if (copied && inheritPerms) {
+      inheritParentPerms(dstFS, dst, conf);
+    }
     return copied;
+  }
+
+  public static void inheritParentPerms(
+      FileSystem dstFS, Path dst, Configuration conf) throws IOException {
+    inheritPerms(dstFS, dst.getParent(), dst, conf);
+  }
+
+  public static void inheritPerms(
+      FileSystem dstFS, Path src, Path dst, Configuration conf) throws IOException {
+    HdfsUtils.setFullFileStatus(
+        conf, new HdfsUtils.HadoopFileStatus(conf, dstFS, src), dstFS, dst, true);
   }
 
   public static boolean distCp(FileSystem srcFS, List<Path> srcPaths, Path dst,
@@ -682,8 +727,9 @@ public final class FileUtils {
     return result;
   }
 
-  public static boolean rename(FileSystem fs, Path sourcePath,
-                               Path destPath, Configuration conf) throws IOException {
+  public static boolean renameWithPerms(FileSystem fs, Path sourcePath,
+                               Path destPath, boolean inheritPerms,
+                               Configuration conf) throws IOException {
     LOG.info("Renaming " + sourcePath + " to " + destPath);
 
     // If destPath directory exists, rename call will move the sourcePath
@@ -692,7 +738,19 @@ public final class FileUtils {
       throw new IOException("Cannot rename the source path. The destination "
           + "path already exists.");
     }
-    return fs.rename(sourcePath, destPath);
+
+    if (!inheritPerms) {
+      //just rename the directory
+      return fs.rename(sourcePath, destPath);
+    } else {
+      //rename the directory
+      if (fs.rename(sourcePath, destPath)) {
+        FileUtils.inheritParentPerms(fs, destPath, conf);
+        return true;
+      }
+
+      return false;
+    }
   }
 
   /**

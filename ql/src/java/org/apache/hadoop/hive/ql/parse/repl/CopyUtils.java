@@ -76,9 +76,10 @@ public class CopyUtils {
         Path destination = destMapEntry.getKey();
         List<ReplChangeManager.FileInfo> fileInfoList = destMapEntry.getValue();
         boolean useRegularCopy = regularCopy(destinationFs, sourceFs, fileInfoList);
+        boolean inheritPerms = hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS);
 
         if (!destinationFs.exists(destination)
-                && !FileUtils.mkdir(destinationFs, destination, hiveConf)) {
+                && !FileUtils.mkdir(destinationFs, destination, inheritPerms, hiveConf)) {
           LOG.error("Failed to create destination directory: " + destination);
           throw new IOException("Destination directory creation failed");
         }

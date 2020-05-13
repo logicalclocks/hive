@@ -151,6 +151,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
   private transient Path destTablePath;
   private transient boolean isInsertOverwrite;
   private transient String counterGroup;
+  private transient boolean inheritPerms;
   private transient BiFunction<Object[], ObjectInspector[], Integer> hashFunc;
   /**
    * Counters.
@@ -251,7 +252,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
         if (Utilities.FILE_OP_LOGGER.isTraceEnabled()) {
           Utilities.FILE_OP_LOGGER.trace("commit making path for dyn/skew: " + finalPaths[idx].getParent());
         }
-        FileUtils.mkdir(fs, finalPaths[idx].getParent(), hconf);
+        FileUtils.mkdir(fs, finalPaths[idx].getParent(), inheritPerms, hconf);
       }
       if(outPaths[idx] != null && fs.exists(outPaths[idx])) {
         if (Utilities.FILE_OP_LOGGER.isTraceEnabled()) {
@@ -506,6 +507,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
       destTablePath = conf.getDestPath();
       isInsertOverwrite = conf.getInsertOverwrite();
       counterGroup = HiveConf.getVar(hconf, HiveConf.ConfVars.HIVECOUNTERGROUP);
+      inheritPerms = HiveConf.getBoolVar(hconf, ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS);
       if (LOG.isInfoEnabled()) {
         LOG.info("Using serializer : " + serializer + " and formatter : " + hiveOutputFormat +
             (isCompressed ? " with compression" : ""));
@@ -745,9 +747,8 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
       // If MM wants to create a new base for IOW (instead of delta dir), it should specify it here
       if (conf.getWriteType() == AcidUtils.Operation.NOT_ACID || conf.isMmTable()) {
         Path outPath = fsp.outPaths[filesIdx];
-        if (conf.isMmTable()
-            && !FileUtils.mkdir(fs, outPath.getParent(), hconf)) {
-          LOG.warn("Unable to create directory with inheritPerms: " + outPath);
+        if (conf.isMmTable() && !FileUtils.mkdir(fs, outPath.getParent(), inheritPerms, hconf)) {
+          LOG.warn("Unable to create directory: " + outPath);
         }
         fsp.outWriters[filesIdx] = HiveFileFormatUtils.getHiveRecordWriter(jc, conf.getTableInfo(),
             outputClass, conf, outPath, reporter);
@@ -825,11 +826,10 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
   }
 
   private void createDpDir(final Path dpPath) throws IOException {
-    if (!fs.exists(dpPath)) {
-      fs.mkdirs(dpPath);
-      if (reporter != null) {
-        reporter.incrCounter(counterGroup, Operator.HIVE_COUNTER_CREATED_DYNAMIC_PARTITIONS, 1);
-      }
+    if (fs.exists(dpPath)) return;
+    FileUtils.mkdir(fs, dpPath, inheritPerms, hconf);
+    if (reporter != null) {
+      reporter.incrCounter(counterGroup, Operator.HIVE_COUNTER_CREATED_DYNAMIC_PARTITIONS, 1);
     }
   }
 
@@ -1309,7 +1309,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
       }
       if (conf.isMmTable()) {
         Utilities.writeMmCommitManifest(commitPaths, specPath, fs, taskId,
-                conf.getTableWriteId(), conf.getStatementId(), unionPath, conf.getInsertOverwrite());
+            conf.getTableWriteId(), conf.getStatementId(), unionPath, conf.getInsertOverwrite());
       }
       // Only publish stats if this operator's flag was set to gather stats
       if (conf.isGatherStats()) {

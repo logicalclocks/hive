@@ -858,6 +858,10 @@ public class MetastoreConf {
         "validates existing schema against code. turn this on if you want to verify existing schema"),
     WAREHOUSE("metastore.warehouse.dir", "hive.metastore.warehouse.dir", "/user/hive/warehouse",
         "location of default database for the warehouse"),
+    WAREHOUSE_SUBDIR_INHERIT_PERMS("metastore.warehouse.subdir.inherit.perms",
+        "hive.warehouse.subdir.inherit.perms", false,
+        "Set this to false if the table directories should be created with the permissions derived" +
+            " from dfs umask instead of inheriting the permission of the warehouse or database directory."),
     WRITE_SET_REAPER_INTERVAL("metastore.writeset.reaper.interval",
         "hive.writeset.reaper.interval", 60, TimeUnit.SECONDS,
         "Frequency of WriteSet reaper runs"),

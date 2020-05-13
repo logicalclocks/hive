@@ -339,7 +339,7 @@ public class WarehouseInstance implements Closeable {
       try {
         FileSystem localFs = localPath.getFileSystem(hiveConf);
         boolean success = FileUtils
-            .copy(localFs, localPath, fs, destinationBasePath, false, false, hiveConf);
+            .copy(localFs, localPath, fs, destinationBasePath, false, false, hiveConf, false);
         if (!success) {
           fail("FileUtils could not copy local uri " + localPath.toString() + " to hdfs");
         }

@@ -277,7 +277,7 @@ public class Warehouse {
     FileSystem fs;
     try {
       fs = getFs(f);
-      return FileUtils.mkdir(fs, f);
+      return FileUtils.mkdir(fs, f, MetastoreConf.getBoolVar(conf, ConfVars.WAREHOUSE_SUBDIR_INHERIT_PERMS), conf);
     } catch (IOException e) {
       MetaStoreUtils.logAndThrowMetaException(e);
     }

@@ -18,6 +18,15 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -25,6 +34,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.HiveStatsUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.Order;
@@ -64,15 +74,6 @@ import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-
 /**
  * MoveTask implementation.
  **/
@@ -80,6 +81,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
 
   private static final long serialVersionUID = 1L;
   private static transient final Logger LOG = LoggerFactory.getLogger(MoveTask.class);
+  private boolean inheritPerms;
 
   public MoveTask() {
     super();
@@ -95,7 +97,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
 
       FileSystem fs = sourcePath.getFileSystem(conf);
       if (isDfsDir) {
-        moveFileInDfs (sourcePath, targetPath, conf);
+        moveFileInDfs(sourcePath, targetPath, conf);
       } else {
         // This is a local file
         FileSystem dstFs = FileSystem.getLocal(conf);
@@ -107,7 +109,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
     }
   }
 
-  private void moveFileInDfs (Path sourcePath, Path targetPath, HiveConf conf)
+  private void moveFileInDfs(Path sourcePath, Path targetPath, HiveConf conf)
       throws HiveException, IOException {
 
     final FileSystem srcFs, tgtFs;
@@ -133,7 +135,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
         deletePath = createTargetPath(targetPath, tgtFs);
       }
       Hive.clearDestForSubDirSrc(conf, targetPath, sourcePath, false);
-      if (!Hive.moveFile(conf, sourcePath, targetPath, true, false)) {
+      if (!Hive.moveFile(conf, sourcePath, targetPath, true, false, inheritPerms)) {
         try {
           if (deletePath != null) {
             tgtFs.delete(deletePath, true);
@@ -168,7 +170,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
         throw new HiveException("Target " + targetPath + " is not a local directory.");
       }
     } else {
-      if (!FileUtils.mkdir(dstFs, targetPath, conf)) {
+      if (!FileUtils.mkdir(dstFs, targetPath, false, conf)) {
         throw new HiveException("Failed to create local target directory " + targetPath);
       }
     }
@@ -197,6 +199,9 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
         actualPath = actualPath.getParent();
       }
       fs.mkdirs(mkDirPath);
+      if (inheritPerms) {
+        FileUtils.inheritPerms(fs, actualPath, mkDirPath, conf);
+      }
     }
     return deletePath;
   }
@@ -276,6 +281,8 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
         + work.getLoadMultiFilesWork());
     }
 
+    inheritPerms = HiveConf.getBoolVar(conf, ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS);
+
     try {
       if (driverContext.getCtx().getExplainAnalyze() == AnalyzeState.RUNNING) {
         return 0;
@@ -300,7 +307,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
             FileStatus[] srcs = srcFs.globStatus(sourcePath);
             if(srcs != null) {
               List<Path> newFiles = new ArrayList<>();
-              Hive.moveAcidFiles(srcFs, srcs, targetPath, newFiles);
+              Hive.moveAcidFiles(srcFs, srcs, targetPath, newFiles, inheritPerms, conf);
             } else {
               LOG.debug("No files found to move from " + sourcePath + " to " + targetPath);
             }
@@ -324,13 +331,13 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           FileSystem destFs = destPath.getFileSystem(conf);
           if (filePrefix == null) {
             if (!destFs.exists(destPath.getParent())) {
-              destFs.mkdirs(destPath.getParent());
+              FileUtils.mkdir(destFs, destPath.getParent(), inheritPerms, conf);
             }
             Utilities.FILE_OP_LOGGER.debug("MoveTask moving (multi-file) " + srcPath + " to " + destPath);
             moveFile(srcPath, destPath, isDfsDir);
           } else {
             if (!destFs.exists(destPath)) {
-              destFs.mkdirs(destPath);
+              FileUtils.mkdir(destFs, destPath, inheritPerms, conf);
             }
             FileSystem srcFs = srcPath.getFileSystem(conf);
             FileStatus[] children = srcFs.listStatus(srcPath);

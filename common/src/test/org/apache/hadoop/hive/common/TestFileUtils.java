@@ -214,6 +214,7 @@ public class TestFileUtils {
     Path copySrc = new Path("copySrc");
     Path copyDst = new Path("copyDst");
     HiveConf conf = new HiveConf(TestFileUtils.class);
+    conf.set(HiveConf.ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS.varname, "false");
 
     FileSystem mockFs = mock(FileSystem.class);
     when(mockFs.getUri()).thenReturn(URI.create("hdfs:///"));
@@ -226,7 +227,7 @@ public class TestFileUtils {
     HadoopShims shims = mock(HadoopShims.class);
     when(shims.runDistCp(Collections.singletonList(copySrc), copyDst, conf)).thenReturn(true);
 
-    Assert.assertTrue(FileUtils.copy(mockFs, copySrc, mockFs, copyDst, false, false, conf, shims));
+    Assert.assertTrue(FileUtils.copy(mockFs, copySrc, mockFs, copyDst, false, false, conf, shims, false));
     verify(shims).runDistCp(Collections.singletonList(copySrc), copyDst, conf);
   }
 
