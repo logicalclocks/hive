@@ -5,7 +5,6 @@ import io.hops.security.HopsUtil;
 import io.hops.security.HopsX509AuthenticationException;
 import io.hops.security.HopsX509Authenticator;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hive.service.rpc.thrift.TCLIService;
 import org.apache.thrift.TException;
