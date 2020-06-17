@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.*;
@@ -70,31 +71,18 @@ public class TestTLSHiveMetastoreClient {
   public static void setUp() throws Exception {
     outputDir = KeyStoreTestUtil.getClasspathDir(TestTLSHiveMetastoreClient.class);
 
-    generateCerts();
-    Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(serverKeyStore.toString(),
-        password, password, serverTrustStore.toString(), password, "");
-    Path sslServerPath = Paths.get(outputDir, "ssl-server.xml");
-    File sslServer = new File(sslServerPath.toUri());
-    KeyStoreTestUtil.saveConfig(sslServer, sslServerConf);
-
     // Configure SSL
     hiveConf = MetastoreConf.newMetastoreConf();
     MetaStoreTestUtils.setConfForStandloneMode(hiveConf);
+    String username = UserGroupInformation.getCurrentUser().getUserName();
+    hiveConf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + username, "*");
+    generateCerts();
 
-    hiveConf.set(MetastoreConf.ConfVars.HIVE_SUPER_USER.getVarname(),
-        UserGroupInformation.getCurrentUser().getUserName());
+    hiveConf.set(MetastoreConf.ConfVars.HIVE_SUPER_USER.getVarname(), username);
 
     hiveConf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
-    hiveConf.addResource("ssl-server.xml");
     hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1,TLSv1");
     hiveConf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
-
-    // Create dummy password file for CertificateLocalizationService to start
-    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(hiveConf);
-    Path passwdFile = Paths.get(outputDir, loader.getSuperMaterialPasswdFilename(
-            UserGroupInformation.getCurrentUser().getUserName()));
-    FileUtils.writeStringToFile(passwdFile.toFile(), "password", Charset.defaultCharset());
-    hiveConf.set(CommonConfigurationKeys.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, outputDir);
 
     MetastoreConf.setVar(hiveConf, MetastoreConf.ConfVars.RAW_STORE_IMPL,
         DummyRawStoreForJdoConnection.class.getName());
@@ -341,7 +329,7 @@ public class TestTLSHiveMetastoreClient {
   }
 
   @Test
-  public void testClientMachineCertificates() throws Exception {
+  public void testSuperuserCertificates() throws Exception {
     hmsc = new HiveMetaStoreClient(hiveConf);
   }
 
@@ -353,9 +341,16 @@ public class TestTLSHiveMetastoreClient {
     caKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
     caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg, true);
 
-    serverKeyStore = Paths.get(outputDir, "server.keystore.jks");
-    serverTrustStore = Paths.get(outputDir, "server.truststore.jks");
-    generateCertificate("CN=" + NetUtils.getHostNameOfIP("127.0.0.1"), "server_alias", serverKeyStore, serverTrustStore);
+    String username = UserGroupInformation.getCurrentUser().getUserName();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(hiveConf);
+    serverKeyStore = Paths.get(outputDir, loader.getSuperKeystoreFilename(username));
+    serverTrustStore = Paths.get(outputDir, loader.getSuperTruststoreFilename(username));
+    generateCertificate("CN=" + NetUtils.getHostNameOfIP("127.0.0.1") + ",L=" + username, "server_alias",
+            serverKeyStore, serverTrustStore);
+
+    Path passwdFile = Paths.get(outputDir, loader.getSuperMaterialPasswdFilename(username));
+    FileUtils.writeStringToFile(passwdFile.toFile(), password, Charset.defaultCharset());
+    hiveConf.set(CommonConfigurationKeys.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, outputDir);
 
     // Generate client certificate with the correct CN field and signed by the CA
     clientKeyStore = Paths.get(outputDir, "c_client.keystore.jks");

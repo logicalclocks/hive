@@ -146,7 +146,7 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
       }
     }
   }
-  
+
    protected void handleSetUGISSL(TUGIContainingTransport ugiTrans,
                                   set_ugi<Iface> fn, TMessage msg, TProtocol iprot, TProtocol oprot)
       throws TException, SecurityException, SSLException, IllegalArgumentException {
