@@ -1,6 +1,11 @@
 package org.apache.hive.service.auth;
 
+import io.hops.security.CertificateLocalizationCtx;
+import io.hops.security.HopsUtil;
+import io.hops.security.HopsX509AuthenticationException;
+import io.hops.security.HopsX509Authenticator;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hive.service.rpc.thrift.TCLIService;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TProtocol;
@@ -14,15 +19,22 @@ import javax.net.ssl.SSLSocket;
 import javax.security.cert.X509Certificate;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.UnknownHostException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class TSSLBasedProcessor<I extends TCLIService.Iface> extends TSetIpAddressProcessor<TCLIService.Iface> {
   private static final Logger LOGGER = LoggerFactory.getLogger(TSetIpAddressProcessor.class.getName());
+  private static final Pattern PROJECT_USER = Pattern.compile(HopsSSLSocketFactory.USERNAME_PATTERN);
+  private final HopsX509Authenticator hopsX509Authenticator;
   private HiveConf hiveConf = null;
 
   public TSSLBasedProcessor(TCLIService.Iface iface, HiveConf hiveConf) {
     super(iface);
     this.hiveConf = hiveConf;
+    hopsX509Authenticator = new HopsX509Authenticator(hiveConf);
+    CertificateLocalizationCtx.getInstance().setProxySuperusers(hiveConf);
   }
 
   @Override
@@ -45,34 +57,34 @@ public class TSSLBasedProcessor<I extends TCLIService.Iface> extends TSetIpAddre
 
       // Client certificate is always the first
       String DN = certs[0].getSubjectDN().getName();
-      String[] dnTokens = DN.split(",");
-      String[] cnTokens = dnTokens[0].split("=", 2);
-      if (cnTokens.length != 2) {
+      String cn = HopsUtil.extractCNFromSubject(DN);
+      if (cn == null) {
         throw new TException("Cannot authenticate the user: Unrecognized CN format");
       }
 
-      if (cnTokens[1].contains("__")) {
+      Matcher matcher = PROJECT_USER.matcher(cn);
+      if (matcher.matches()) {
         // The certificate is in the format projectName__userName
-        THREAD_LOCAL_USER_NAME.set(cnTokens[1]);
+        THREAD_LOCAL_USER_NAME.set(cn);
       } else {
-        InetAddress hostnameIp = null;
         try {
-          // Hostname resolution and check against the ip of the machine doing the request
-          hostnameIp = InetAddress.getByName(cnTokens[1]);
-        } catch (java.net.UnknownHostException ex) {
+          if (hopsX509Authenticator.isTrustedConnection(InetAddress.getByName(THREAD_LOCAL_IP_ADDRESS.get()), cn)) {
+            String locality = HopsUtil.extractLFromSubject(DN);
+            if (CertificateLocalizationCtx.getInstance().getProxySuperusers().contains(locality)) {
+              // Operate as superuser
+              THREAD_LOCAL_USER_NAME.set(hiveConf.getVar(HiveConf.ConfVars.HIVE_SUPER_USER));
+              return;
+            }
+          }
+        } catch (UnknownHostException ex) {
           LOGGER.error("Cannot resolve machine address: ", ex);
           throw new TException("Cannot authenticate the user");
+        } catch (HopsX509AuthenticationException ex) {
+          LOGGER.debug("Cannot authenticate super user", ex);
+          throw new TException("Authentication failure", ex);
         }
 
-        if (!hostnameIp.getHostAddress().equals(THREAD_LOCAL_IP_ADDRESS.get())) {
-          // The requests doesn't come from the same machine of the certificate.
-          // Something shady is happening here. Do not authenticate the user.
-          LOGGER.error("Superuser request coming from a different host");
-          throw new TException("Cannot authenticate the user");
-        }
-
-        // Operate as superuser
-        THREAD_LOCAL_USER_NAME.set(hiveConf.getVar(HiveConf.ConfVars.HIVE_SUPER_USER));
+        throw new TException("Failed to authenticate superuser");
       }
     } catch (SSLException e) {
       throw new TException(e);

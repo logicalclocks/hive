@@ -22,12 +22,16 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.security.PrivilegedExceptionAction;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 
 import io.hops.common.Pair;
 import io.hops.security.HopsUtil;
+import io.hops.security.HopsX509AuthenticationException;
+import io.hops.security.HopsX509Authenticator;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.set_ugi_args;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.set_ugi_result;
@@ -50,7 +54,6 @@ import org.apache.thrift.TException;
 
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSocket;
-import javax.security.cert.X509Certificate;
 
 @SuppressWarnings("rawtypes")
 public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Iface> {
@@ -58,6 +61,7 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
   private final I iface;
   private final Map<String,  ProcessFunction<Iface, ? extends  TBase>>
     functions;
+  private final HopsX509Authenticator hopsX509Authenticator;
   static final Logger LOG = LoggerFactory.getLogger(TSSLBasedProcessor.class);
 
   private Configuration metastoreConf = null;
@@ -70,6 +74,7 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
     this.iface = iface;
     this.functions = getProcessMapView();
     this.metastoreConf = metastoreConf;
+    hopsX509Authenticator = new HopsX509Authenticator(metastoreConf);
   }
 
   @SuppressWarnings("unchecked")
@@ -141,50 +146,7 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
       }
     }
   }
-
-  private Pair<String, String> extractDN(TProtocol in) throws TException, SSLException {
-    // Get the the certificate chain out of the TProtocol object
-    TTransport tTransport = in.getTransport();
-    Socket socket = ((TUGIContainingTransport) tTransport).getSocket();
-    X509Certificate[] certs = ((SSLSocket) socket).getSession().getPeerCertificateChain();
-
-    // Make sure it's 2 way ssl, i.e. client certificate is available
-    if (certs.length == 0) {
-      LOG.error("Client certificate not available");
-      throw new SSLException("Client certificate not available");
-    }
-
-    // Client certificate is always the first
-    String DN = certs[0].getSubjectDN().getName();
-    String CN = HopsUtil.extractCNFromSubject(DN);
-    String applicationId = HopsUtil.extractOFromSubject(DN);
-
-    if (CN.contains("__")) {
-      // The certificate is in the format projectName__userName
-      return new Pair<>(CN, applicationId);
-    } else {
-      // The certificate might be a machine certificate if the operation is requested
-      // by the superuser
-      InetAddress hostnameIp = null;
-      try {
-        // Hostname resolution and check against the ip of the machine doing the request
-        hostnameIp = InetAddress.getByName(CN);
-      } catch (java.net.UnknownHostException ex) {
-        LOG.error("Cannot resolve machine address: ", ex);
-        throw new TException("Cannot authenticate the user");
-      }
-
-      if (!hostnameIp.getHostAddress().equals(HiveMetaStore.HMSHandler.getThreadLocalIpAddress())) {
-        // The requests doesn't come from the same machine of the certificate.
-        // Something shady is happening here. Do not authenticate the user.
-        LOG.error("Superuser request coming from a different host");
-        throw new TException("Cannot authenticate the user");
-      }
-
-      return new Pair<>(MetastoreConf.getVar(metastoreConf, MetastoreConf.ConfVars.HIVE_SUPER_USER), null);
-    }
-  }
-
+  
    protected void handleSetUGISSL(TUGIContainingTransport ugiTrans,
                                   set_ugi<Iface> fn, TMessage msg, TProtocol iprot, TProtocol oprot)
       throws TException, SecurityException, SSLException, IllegalArgumentException {
@@ -213,17 +175,27 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
       List<String> principals = result.getSuccess();
       // Store the ugi in transport and then continue as usual.
       String user = principals.remove(principals.size()-1);
-      Pair<String, String> certDN = extractDN(iprot);
-      if (!user.equals(certDN.getL())) {
-        // Mismatch between UGI user and common name in the certificate
-        LOG.error("Mismatch between the UGI user: ", user,
-            " and common name in the certificate: ", certDN.getL());
-        throw new TTransportException("Client not authorized.");
-      }
 
+      // Get the the certificate chain out of the TProtocol object
+      TTransport tTransport = iprot.getTransport();
+      Socket socket = ((TUGIContainingTransport) tTransport).getSocket();
+      X509Certificate[] certs = (X509Certificate[]) ((SSLSocket) socket).getSession().getPeerCertificates();
+
+      // Make sure it's 2 way ssl, i.e. client certificate is available
+      if (certs.length == 0) {
+        LOG.error("Client certificate not available");
+        throw new SSLException("Client certificate not available");
+      }
       clientUgi = UserGroupInformation.createRemoteUser(user);
-      if (certDN.getR() != null) {
-        clientUgi.addApplicationId(certDN.getR());
+
+      try {
+        InetAddress address = InetAddress.getByName(HiveMetaStore.HMSHandler.getThreadLocalIpAddress());
+        hopsX509Authenticator.authenticateConnection(clientUgi, certs[0], address, "hive-metastore");
+      } catch (UnknownHostException ex) {
+        LOG.error("Cannot validate client IP address: " + HiveMetaStore.HMSHandler.getThreadLocalIpAddress());
+        throw new TTransportException("Cannot validate client IP address", ex);
+      } catch (HopsX509AuthenticationException ex) {
+        throw new TTransportException("Client not authorized", ex);
       }
 
       ugiTrans.setClientUGI(clientUgi);

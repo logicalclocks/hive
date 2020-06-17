@@ -107,7 +107,7 @@ public class TestHopsTLSTSocketFactory {
   public void startServer() throws Exception {
     // Generate CA
     caKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
-    caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg);
+    caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg, true);
 
     hiveConf = new HiveConf();
     // Configure TLS

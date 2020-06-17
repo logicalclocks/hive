@@ -19,25 +19,24 @@ package org.apache.hadoop.hive.metastore;
 
 import io.hops.security.CertificateLocalization;
 import io.hops.security.CertificateLocalizationCtx;
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.ExpectedException;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -90,6 +89,13 @@ public class TestTLSHiveMetastoreClient {
     hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1,TLSv1");
     hiveConf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
 
+    // Create dummy password file for CertificateLocalizationService to start
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(hiveConf);
+    Path passwdFile = Paths.get(outputDir, loader.getSuperMaterialPasswdFilename(
+            UserGroupInformation.getCurrentUser().getUserName()));
+    FileUtils.writeStringToFile(passwdFile.toFile(), "password", Charset.defaultCharset());
+    hiveConf.set(CommonConfigurationKeys.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, outputDir);
+
     MetastoreConf.setVar(hiveConf, MetastoreConf.ConfVars.RAW_STORE_IMPL,
         DummyRawStoreForJdoConnection.class.getName());
     MetastoreConf.setVar(hiveConf,
@@ -121,6 +127,12 @@ public class TestTLSHiveMetastoreClient {
     cleanCertificateLocalization(fakeUser, "app");
   }
 
+  @AfterClass
+  public static void afterClass() {
+    if (outputDir != null) {
+      FileUtils.deleteQuietly(new File(outputDir));
+    }
+  }
 
   @Test
   public void testClientMatchingCNUGI() throws Exception {
@@ -339,7 +351,7 @@ public class TestTLSHiveMetastoreClient {
 
     // Generate CA
     caKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
-    caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg);
+    caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg, true);
 
     serverKeyStore = Paths.get(outputDir, "server.keystore.jks");
     serverTrustStore = Paths.get(outputDir, "server.truststore.jks");
