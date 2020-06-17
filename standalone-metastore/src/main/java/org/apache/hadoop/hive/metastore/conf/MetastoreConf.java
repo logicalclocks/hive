@@ -953,6 +953,8 @@ public class MetastoreConf {
     METADATACONSISTENCY("hops.metadata.consistent", "hops.metadata.consistent", true,
         "enable hops metadata consistency. This option is meant to be disabled for testing purposes"),
     HIVE_SUPER_USER("hive.superuser", "hive.superuser", "hive", "The user to use to create databases"),
+    HIVE_SUPERUSER_ALLOWED_IMPERSONATION("hive.superuser.impersonation-users", "hive.superuser.impersonation-users", "",
+            "User that are allowed to impersonate the Hive superuser"),
     CERT_RELOAD_THREAD_SLEEP("cert.reload.thread.sleep", "cert.reload.thread.sleep", 60000,
         "Sleep time for the certificate reloader thread - default 1m");
 

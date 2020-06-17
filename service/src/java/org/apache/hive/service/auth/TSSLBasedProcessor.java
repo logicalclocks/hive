@@ -1,10 +1,11 @@
 package org.apache.hive.service.auth;
 
-import io.hops.security.CertificateLocalizationCtx;
+import com.google.common.base.Strings;
 import io.hops.security.HopsUtil;
 import io.hops.security.HopsX509AuthenticationException;
 import io.hops.security.HopsX509Authenticator;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hive.service.rpc.thrift.TCLIService;
 import org.apache.thrift.TException;
@@ -20,6 +21,9 @@ import javax.security.cert.X509Certificate;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,13 +32,25 @@ public class TSSLBasedProcessor<I extends TCLIService.Iface> extends TSetIpAddre
   private static final Logger LOGGER = LoggerFactory.getLogger(TSetIpAddressProcessor.class.getName());
   private static final Pattern PROJECT_USER = Pattern.compile(HopsSSLSocketFactory.USERNAME_PATTERN);
   private final HopsX509Authenticator hopsX509Authenticator;
+  private final Set<String> usersAllowedToImpersonateSuperuser;
   private HiveConf hiveConf = null;
 
   public TSSLBasedProcessor(TCLIService.Iface iface, HiveConf hiveConf) {
     super(iface);
     this.hiveConf = hiveConf;
     hopsX509Authenticator = new HopsX509Authenticator(hiveConf);
-    CertificateLocalizationCtx.getInstance().setProxySuperusers(hiveConf);
+    usersAllowedToImpersonateSuperuser = new HashSet<>(5);
+    String defaultAllowedUsersStr = (String) HiveConf.ConfVars.HIVE_SUPERUSER_ALLOWED_IMPERSONATION.defaultStrVal;
+    String[] defaultAllowedUsers;
+    if (!Strings.isNullOrEmpty(defaultAllowedUsersStr)) {
+      defaultAllowedUsers = defaultAllowedUsersStr.split(",");
+    } else {
+      defaultAllowedUsers = new String[0];
+    }
+
+    Collections.addAll(usersAllowedToImpersonateSuperuser,
+            hiveConf.getTrimmedStrings(HiveConf.ConfVars.HIVE_SUPERUSER_ALLOWED_IMPERSONATION.varname,
+                    defaultAllowedUsers));
   }
 
   @Override
@@ -70,7 +86,7 @@ public class TSSLBasedProcessor<I extends TCLIService.Iface> extends TSetIpAddre
         try {
           if (hopsX509Authenticator.isTrustedConnection(InetAddress.getByName(THREAD_LOCAL_IP_ADDRESS.get()), cn)) {
             String locality = HopsUtil.extractLFromSubject(DN);
-            if (CertificateLocalizationCtx.getInstance().getProxySuperusers().contains(locality)) {
+            if (usersAllowedToImpersonateSuperuser.contains(locality.trim())) {
               // Operate as superuser
               THREAD_LOCAL_USER_NAME.set(hiveConf.getVar(HiveConf.ConfVars.HIVE_SUPER_USER));
               return;

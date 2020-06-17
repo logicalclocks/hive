@@ -3320,6 +3320,8 @@ public class HiveConf extends Configuration {
 
     // SSL settings
     HIVE_SUPER_USER("hive.superuser", "hive", "The user to use to create databases"),
+    HIVE_SUPERUSER_ALLOWED_IMPERSONATION("hive.superuser.impersonation-users", "",
+            "User that are allowed to impersonate the Hive superuser"),
     HIVE_SERVER2_MAP_FAIR_SCHEDULER_QUEUE("hive.server2.map.fair.scheduler.queue", true,
         "If the YARN fair scheduler is configured and HiveServer2 is running in non-impersonation mode,\n" +
         "this setting determines the user for fair scheduler queue mapping.\n" +
@@ -4295,6 +4297,7 @@ public class HiveConf extends Configuration {
     HIVE_CONF_HIDDEN_LIST("hive.conf.hidden.list",
         METASTOREPWD.varname
         + "," + HIVE_SUPER_USER.varname
+        + "," + HIVE_SUPERUSER_ALLOWED_IMPERSONATION.varname
         // Add ssl-server.xml conf properties
         + "," + FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY)
         + "," + FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY)

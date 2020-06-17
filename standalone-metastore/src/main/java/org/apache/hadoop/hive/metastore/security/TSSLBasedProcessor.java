@@ -25,11 +25,9 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.security.PrivilegedExceptionAction;
 import java.security.cert.X509Certificate;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import io.hops.common.Pair;
-import io.hops.security.HopsUtil;
+import com.google.common.base.Strings;
 import io.hops.security.HopsX509AuthenticationException;
 import io.hops.security.HopsX509Authenticator;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface;
@@ -62,6 +60,7 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
   private final Map<String,  ProcessFunction<Iface, ? extends  TBase>>
     functions;
   private final HopsX509Authenticator hopsX509Authenticator;
+  private final Set<String> usersAllowedToImpersonateSuperuser;
   static final Logger LOG = LoggerFactory.getLogger(TSSLBasedProcessor.class);
 
   private Configuration metastoreConf = null;
@@ -75,6 +74,18 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
     this.functions = getProcessMapView();
     this.metastoreConf = metastoreConf;
     hopsX509Authenticator = new HopsX509Authenticator(metastoreConf);
+    usersAllowedToImpersonateSuperuser = new HashSet<>(5);
+    String defaultAllowedUsersStr = (String)MetastoreConf.ConfVars.HIVE_SUPERUSER_ALLOWED_IMPERSONATION.getDefaultVal();
+    String[] defaultAllowedUsers;
+    if (!Strings.isNullOrEmpty(defaultAllowedUsersStr)) {
+      defaultAllowedUsers = defaultAllowedUsersStr.split(",");
+    } else {
+      defaultAllowedUsers = new String[0];
+    }
+
+    Collections.addAll(usersAllowedToImpersonateSuperuser,
+            metastoreConf.getTrimmedStrings(MetastoreConf.ConfVars.HIVE_SUPERUSER_ALLOWED_IMPERSONATION.getVarname(),
+                    defaultAllowedUsers));
   }
 
   @SuppressWarnings("unchecked")
@@ -177,26 +188,35 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
       String user = principals.remove(principals.size()-1);
 
       // Get the the certificate chain out of the TProtocol object
-      TTransport tTransport = iprot.getTransport();
-      Socket socket = ((TUGIContainingTransport) tTransport).getSocket();
-      X509Certificate[] certs = (X509Certificate[]) ((SSLSocket) socket).getSession().getPeerCertificates();
+     TTransport tTransport = iprot.getTransport();
+     Socket socket = ((TUGIContainingTransport) tTransport).getSocket();
+     X509Certificate[] certs = (X509Certificate[]) ((SSLSocket) socket).getSession().getPeerCertificates();
 
-      // Make sure it's 2 way ssl, i.e. client certificate is available
-      if (certs.length == 0) {
-        LOG.error("Client certificate not available");
-        throw new SSLException("Client certificate not available");
-      }
-      clientUgi = UserGroupInformation.createRemoteUser(user);
+     // Make sure it's 2 way ssl, i.e. client certificate is available
+     if (certs.length == 0) {
+       LOG.error("Client certificate not available");
+       throw new SSLException("Client certificate not available");
+     }
 
-      try {
-        InetAddress address = InetAddress.getByName(HiveMetaStore.HMSHandler.getThreadLocalIpAddress());
-        hopsX509Authenticator.authenticateConnection(clientUgi, certs[0], address, "hive-metastore");
-      } catch (UnknownHostException ex) {
-        LOG.error("Cannot validate client IP address: " + HiveMetaStore.HMSHandler.getThreadLocalIpAddress());
-        throw new TTransportException("Cannot validate client IP address", ex);
-      } catch (HopsX509AuthenticationException ex) {
-        throw new TTransportException("Client not authorized", ex);
-      }
+     UserGroupInformation tmpUGI = UserGroupInformation.createRemoteUser(user);
+
+     try {
+       InetAddress address = InetAddress.getByName(HiveMetaStore.HMSHandler.getThreadLocalIpAddress());
+       hopsX509Authenticator.authenticateConnection(tmpUGI, certs[0], address, "hive-metastore");
+     } catch (UnknownHostException ex) {
+       LOG.error("Cannot validate client IP address: " + HiveMetaStore.HMSHandler.getThreadLocalIpAddress());
+       throw new TTransportException("Cannot validate client IP address", ex);
+     } catch (HopsX509AuthenticationException ex) {
+       throw new TTransportException("Client not authorized", ex);
+     }
+
+     if (usersAllowedToImpersonateSuperuser.contains(user.trim())) {
+       clientUgi = UserGroupInformation.createRemoteUser(MetastoreConf.getVar(metastoreConf,
+               MetastoreConf.ConfVars.HIVE_SUPER_USER));
+       clientUgi.addApplicationId(tmpUGI.getApplicationId());
+     } else {
+       clientUgi = tmpUGI;
+     }
 
       ugiTrans.setClientUGI(clientUgi);
       oprot.writeMessageBegin(new TMessage(msg.name, TMessageType.REPLY, msg.seqid));

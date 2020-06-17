@@ -79,6 +79,7 @@ public class TestTLSHiveMetastoreClient {
     generateCerts();
 
     hiveConf.set(MetastoreConf.ConfVars.HIVE_SUPER_USER.getVarname(), username);
+    hiveConf.set(MetastoreConf.ConfVars.HIVE_SUPERUSER_ALLOWED_IMPERSONATION.getVarname(), username);
 
     hiveConf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
     hiveConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1,TLSv1");
