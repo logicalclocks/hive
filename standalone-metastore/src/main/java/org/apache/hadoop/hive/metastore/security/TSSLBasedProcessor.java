@@ -213,7 +213,6 @@ public class TSSLBasedProcessor<I extends Iface> extends TUGIBasedProcessor<Ifac
      if (usersAllowedToImpersonateSuperuser.contains(user.trim())) {
        clientUgi = UserGroupInformation.createRemoteUser(MetastoreConf.getVar(metastoreConf,
                MetastoreConf.ConfVars.HIVE_SUPER_USER));
-       clientUgi.addApplicationId(tmpUGI.getApplicationId());
      } else {
        clientUgi = tmpUGI;
      }
