@@ -228,6 +228,16 @@ public class MetastoreConf {
       FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_EXCLUDE_CIPHER_LIST)
   );
 
+  // these properties should not be used by Hive, that's why there is no enum. However they are in the ssl-server.xml
+  // which is available to the daemons. As such we should avoid to print them when a user requests a property dump or
+  // value for a specific field.
+  static {
+    unprintables.add("hops.jwt-manager.master-token");
+    for (int i = 0; i < 5; i++) {
+      unprintables.add("hops.jwt-manager.master-token-" + i);
+    }
+  }
+
   public static ConfVars getMetaConf(String name) {
     return metaConfs.get(name);
   }

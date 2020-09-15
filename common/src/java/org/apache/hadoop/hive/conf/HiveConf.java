@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience.LimitedPrivate;
@@ -4308,6 +4307,15 @@ public class HiveConf extends Configuration {
         + "," + FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY)
         + "," + FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_TYPE_TPL_KEY)
         + "," + FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_EXCLUDE_CIPHER_LIST)
+        // these properties should not be used by Hive, that's why there is no enum. However they are in the ssl-server.xml
+        // which is available to the daemons. As such we should avoid to print them when a user requests a property dump or
+        // value for a specific field.
+        + ",hops.jwt-manager.master-token"
+        + ",hops.jwt-manager.master-token-0"
+        + ",hops.jwt-manager.master-token-1"
+        + ",hops.jwt-manager.master-token-2"
+        + ",hops.jwt-manager.master-token-3"
+        + ",hops.jwt-manager.master-token-4"
         // Adding the S3 credentials from Hadoop config to be hidden
         + ",fs.s3.awsAccessKeyId"
         + ",fs.s3.awsSecretAccessKey"
@@ -5187,8 +5195,13 @@ public class HiveConf extends Configuration {
     }
 
     // Load ssl-server.xml (in HADOOP_CONF_DIR) if we are not in the context of a client
+    String sslServerPath = get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml");
     if (!client) {
-      addResource(get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
+      if (new File(sslServerPath).canRead()) {
+        addResource(sslServerPath);
+      } else {
+        LOG.warn("Could not load ssl-server, this is probably a client so it is fine. Continuing.");
+      }
     }
 
     // Overlay the values of any system properties whose names appear in the list of ConfVars
