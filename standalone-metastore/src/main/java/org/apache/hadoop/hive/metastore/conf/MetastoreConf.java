@@ -234,7 +234,7 @@ public class MetastoreConf {
   static {
     unprintables.add("hops.jwt-manager.master-token");
     for (int i = 0; i < 5; i++) {
-      unprintables.add("hops.jwt-manager.master-token-" + i);
+      unprintables.add("hops.jwt-manager.renew-token-" + i);
     }
   }
 

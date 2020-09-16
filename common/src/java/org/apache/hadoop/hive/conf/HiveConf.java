@@ -4311,11 +4311,11 @@ public class HiveConf extends Configuration {
         // which is available to the daemons. As such we should avoid to print them when a user requests a property dump or
         // value for a specific field.
         + ",hops.jwt-manager.master-token"
-        + ",hops.jwt-manager.master-token-0"
-        + ",hops.jwt-manager.master-token-1"
-        + ",hops.jwt-manager.master-token-2"
-        + ",hops.jwt-manager.master-token-3"
-        + ",hops.jwt-manager.master-token-4"
+        + ",hops.jwt-manager.renew-token-0"
+        + ",hops.jwt-manager.renew-token-1"
+        + ",hops.jwt-manager.renew-token-2"
+        + ",hops.jwt-manager.renew-token-3"
+        + ",hops.jwt-manager.renew-token-4"
         // Adding the S3 credentials from Hadoop config to be hidden
         + ",fs.s3.awsAccessKeyId"
         + ",fs.s3.awsSecretAccessKey"
