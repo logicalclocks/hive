@@ -139,9 +139,9 @@ public class FieldSchema implements org.apache.thrift.TBase<FieldSchema, FieldSc
     String comment)
   {
     this();
-    this.name = org.apache.hive.common.util.HiveStringUtils.intern(name);
-    this.type = org.apache.hive.common.util.HiveStringUtils.intern(type);
-    this.comment = org.apache.hive.common.util.HiveStringUtils.intern(comment);
+    this.name = name;
+    this.type = type;
+    this.comment = comment;
   }
 
   /**
@@ -149,13 +149,13 @@ public class FieldSchema implements org.apache.thrift.TBase<FieldSchema, FieldSc
    */
   public FieldSchema(FieldSchema other) {
     if (other.isSetName()) {
-      this.name = org.apache.hive.common.util.HiveStringUtils.intern(other.name);
+      this.name = other.name;
     }
     if (other.isSetType()) {
-      this.type = org.apache.hive.common.util.HiveStringUtils.intern(other.type);
+      this.type = other.type;
     }
     if (other.isSetComment()) {
-      this.comment = org.apache.hive.common.util.HiveStringUtils.intern(other.comment);
+      this.comment = other.comment;
     }
   }
 
@@ -175,7 +175,7 @@ public class FieldSchema implements org.apache.thrift.TBase<FieldSchema, FieldSc
   }
 
   public void setName(String name) {
-    this.name = org.apache.hive.common.util.HiveStringUtils.intern(name);
+    this.name = name;
   }
 
   public void unsetName() {
@@ -198,7 +198,7 @@ public class FieldSchema implements org.apache.thrift.TBase<FieldSchema, FieldSc
   }
 
   public void setType(String type) {
-    this.type = org.apache.hive.common.util.HiveStringUtils.intern(type);
+    this.type = type;
   }
 
   public void unsetType() {
@@ -221,7 +221,7 @@ public class FieldSchema implements org.apache.thrift.TBase<FieldSchema, FieldSc
   }
 
   public void setComment(String comment) {
-    this.comment = org.apache.hive.common.util.HiveStringUtils.intern(comment);
+    this.comment = comment;
   }
 
   public void unsetComment() {

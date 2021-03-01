@@ -1947,6 +1947,21 @@ module ThriftHiveMetastore
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'set_ugi failed: unknown result')
     end
 
+    def set_crypto(key_store, key_store_password, trust_store, trust_store_password, update)
+      send_set_crypto(key_store, key_store_password, trust_store, trust_store_password, update)
+      recv_set_crypto()
+    end
+
+    def send_set_crypto(key_store, key_store_password, trust_store, trust_store_password, update)
+      send_message('set_crypto', Set_crypto_args, :key_store => key_store, :key_store_password => key_store_password, :trust_store => trust_store, :trust_store_password => trust_store_password, :update => update)
+    end
+
+    def recv_set_crypto()
+      result = receive_message(Set_crypto_result)
+      raise result.o1 unless result.o1.nil?
+      return
+    end
+
     def get_delegation_token(token_owner, renewer_kerberos_principal_name)
       send_get_delegation_token(token_owner, renewer_kerberos_principal_name)
       return recv_get_delegation_token()
@@ -4028,6 +4043,17 @@ module ThriftHiveMetastore
         result.o1 = o1
       end
       write_result(result, oprot, 'set_ugi', seqid)
+    end
+
+    def process_set_crypto(seqid, iprot, oprot)
+      args = read_args(iprot, Set_crypto_args)
+      result = Set_crypto_result.new()
+      begin
+        @handler.set_crypto(args.key_store, args.key_store_password, args.trust_store, args.trust_store_password, args.update)
+      rescue ::MetaException => o1
+        result.o1 = o1
+      end
+      write_result(result, oprot, 'set_crypto', seqid)
     end
 
     def process_get_delegation_token(seqid, iprot, oprot)
@@ -8795,6 +8821,46 @@ module ThriftHiveMetastore
 
     FIELDS = {
       SUCCESS => {:type => ::Thrift::Types::LIST, :name => 'success', :element => {:type => ::Thrift::Types::STRING}},
+      O1 => {:type => ::Thrift::Types::STRUCT, :name => 'o1', :class => ::MetaException}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Set_crypto_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    KEY_STORE = 1
+    KEY_STORE_PASSWORD = 2
+    TRUST_STORE = 3
+    TRUST_STORE_PASSWORD = 4
+    UPDATE = 5
+
+    FIELDS = {
+      KEY_STORE => {:type => ::Thrift::Types::STRING, :name => 'key_store', :binary => true},
+      KEY_STORE_PASSWORD => {:type => ::Thrift::Types::STRING, :name => 'key_store_password'},
+      TRUST_STORE => {:type => ::Thrift::Types::STRING, :name => 'trust_store', :binary => true},
+      TRUST_STORE_PASSWORD => {:type => ::Thrift::Types::STRING, :name => 'trust_store_password'},
+      UPDATE => {:type => ::Thrift::Types::BOOL, :name => 'update'}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Set_crypto_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    O1 = 1
+
+    FIELDS = {
       O1 => {:type => ::Thrift::Types::STRUCT, :name => 'o1', :class => ::MetaException}
     }
 

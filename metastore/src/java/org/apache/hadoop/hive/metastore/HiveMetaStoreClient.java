@@ -18,7 +18,15 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import io.hops.hadoop.shaded.io.hops.security.CertificateLocalizationCtx;
+import io.hops.hadoop.shaded.io.hops.security.HopsUtil;
+import io.hops.hadoop.shaded.org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import io.hops.hadoop.shaded.org.apache.hadoop.security.ssl.SSLFactory;
+import io.hops.hadoop.shaded.org.apache.hadoop.security.ssl.X509SecurityMaterial;
+import io.hops.hadoop.shaded.org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
+
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience;
@@ -27,6 +35,7 @@ import org.apache.hadoop.hive.common.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.conf.HiveConfUtil;
+import org.apache.hadoop.hive.metastore.auth.HiveAuthUtils;
 import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
 import org.apache.hadoop.hive.metastore.api.AbortTxnsRequest;
 import org.apache.hadoop.hive.metastore.api.AddDynamicPartitions;
@@ -147,6 +156,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.LoginException;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
@@ -157,10 +169,17 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.file.Paths;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -204,6 +223,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   // for thrift connects
   private int retries = 5;
   private long retryDelaySeconds = 0;
+
+  private Thread clientCertUpdaterThread = null;
 
   static final protected Logger LOG = LoggerFactory.getLogger("hive.metastore");
 
@@ -423,11 +444,16 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   private void open() throws MetaException {
     isConnected = false;
     TTransportException tte = null;
+    boolean hopsTLS = conf.getBoolean(
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
     boolean useSasl = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_SASL);
     boolean useFramedTransport = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_FRAMED_TRANSPORT);
     boolean useCompactProtocol = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_COMPACT_PROTOCOL);
     int clientSocketTimeout = (int) conf.getTimeVar(
         ConfVars.METASTORE_CLIENT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+
+    HopsSecurityMaterial hopsSecurityMaterial = null;
 
     for (int attempt = 0; !isConnected && attempt < retries; ++attempt) {
       for (URI store : metastoreUris) {
@@ -464,9 +490,28 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
               LOG.error("Couldn't create client transport", ioe);
               throw new MetaException(ioe.toString());
             }
-          } else if (useFramedTransport) {
-            transport = new TFramedTransport(transport);
+          } else {
+            if (hopsTLS) {
+              try {
+                hopsSecurityMaterial = getHopsSecurityMaterial();
+                transport = HiveAuthUtils.get2WayTLSClientSocket(store.getHost(), store.getPort(), clientSocketTimeout,
+                    hopsSecurityMaterial.getTrustStorePath(), hopsSecurityMaterial.getTrustStorePassword(),
+                    hopsSecurityMaterial.getKeyStorePath(), hopsSecurityMaterial.getKeyStorePassword());
+              } catch (IOException | LoginException e) {
+                throw new MetaException(e.toString());
+              } catch (TTransportException e) {
+                tte = e;
+                throw new MetaException(e.toString());
+              }
+            } else {
+              transport = new TSocket(store.getHost(), store.getPort(), clientSocketTimeout);
+            }
+
+            if (useFramedTransport) {
+              transport = new TFramedTransport(transport);
+            }
           }
+
           final TProtocol protocol;
           if (useCompactProtocol) {
             protocol = new TCompactProtocol(transport);
@@ -475,9 +520,11 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
           }
           client = new ThriftHiveMetastore.Client(protocol);
           try {
-            transport.open();
-            LOG.info("Opened a connection to metastore, current connections: " + connCount.incrementAndGet());
+            if (!transport.isOpen()) {
+              transport.open();
+            }
             isConnected = true;
+            LOG.info("Opened a connection to metastore, current connections: " + connCount.incrementAndGet());
           } catch (TTransportException e) {
             tte = e;
             if (LOG.isDebugEnabled()) {
@@ -492,7 +539,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
             // Call set_ugi, only in unsecure mode.
             try {
               UserGroupInformation ugi = Utils.getUGI();
-              client.set_ugi(ugi.getUserName(), Arrays.asList(ugi.getGroupNames()));
+              client.set_ugi(ugi.getUserName(), new ArrayList<String>());
             } catch (LoginException e) {
               LOG.warn("Failed to do login. set_ugi() is not successful, " +
                        "Continuing without it.", e);
@@ -502,6 +549,26 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
             } catch (TException e) {
               LOG.warn("set_ugi() not successful, Likely cause: new client talking to old server. "
                   + "Continuing without it.", e);
+            }
+          }
+
+          if (isConnected && hopsTLS) {
+            // In case hopsTLS is enabled, we need to send the user crypto material to the metastore, so it can
+            // operate on HopsFS
+            try {
+              String username = UserGroupInformation.getCurrentUser().getUserName();
+
+              // For the superuser with don't need to send the certificate to the hive metastore, as it will use the
+              // machine's certificates.
+              if (!username.equals("hive")) {
+                client.set_crypto(hopsSecurityMaterial.getKeyStore(), hopsSecurityMaterial.getKeyStorePassword(),
+                    hopsSecurityMaterial.getTrustStore(), hopsSecurityMaterial.getTrustStorePassword(), false);
+              }
+
+            } catch (IOException | TException e) {
+              tte = new TTransportException(e.getCause());
+              LOG.error("set_crypto() not successful", e);
+              throw new MetaException(e.getMessage());
             }
           }
         } catch (MetaException e) {
@@ -529,6 +596,208 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     snapshotActiveConf();
 
     LOG.info("Connected to metastore.");
+  }
+
+  /**
+   * Hops security related code. This part of code assumes that the certificates
+   * are materialized in the USER_CERTS_PATH directory under username__tstore.jks/
+   * username__kstore.jks/username__cert.key
+   */
+  private HopsSecurityMaterial getHopsSecurityMaterial() throws IOException, LoginException, MetaException {
+    HopsSecurityMaterial securityMaterial;
+    String username = Utils.getUGI().getUserName();
+    securityMaterial = getMaterialForUser(username);
+    return securityMaterial;
+  }
+
+  private HopsSecurityMaterial getMaterialForUser(String username)
+      throws IOException, MetaException {
+    HopsSecurityMaterial securityMaterial = null;
+
+    if (CertificateLocalizationCtx.getInstance().getCertificateLocalization() != null){
+      // Client running within the context of a HS2
+      try {
+        securityMaterial = readFromCertLocService(username);
+      } catch (InterruptedException e) {
+        throw new MetaException(e.toString());
+      } catch (FileNotFoundException e) {
+        // The certificates are not in the certificate materialization service, try reading from the fs
+        // This might happens in the tests
+        securityMaterial = readClientMaterial();
+
+        // In this case we are using the APP certificates to connect to the metastore. App certificates are rotated
+        // and revoked, which means that the client needs to periodically update the certificate cached in the metastore
+        // or else the metastore won't be able to operate on the FS if the certificate is rotated.
+        clientCertUpdaterThread = new Thread(new ClientCertUpdater(client, securityMaterial));
+        clientCertUpdaterThread.start();
+      }
+
+    } else {
+      // Client not from the HS2 (Example: Spark client)
+      securityMaterial = readClientMaterial();
+
+      // In this case we are using the APP certificates to connect to the metastore. App certificates are rotated
+      // and revoked, which means that the client needs to periodically update the certificate cached in the metastore
+      // or else the metastore won't be able to operate on the FS if the certificate is rotated.
+      clientCertUpdaterThread = new Thread(new ClientCertUpdater(client, securityMaterial));
+      clientCertUpdaterThread.start();
+    }
+
+    return securityMaterial;
+  }
+
+  private HopsSecurityMaterial readFromCertLocService(String username)
+      throws InterruptedException, FileNotFoundException {
+    X509SecurityMaterial userCryptoMaterial = CertificateLocalizationCtx.getInstance().
+        getCertificateLocalization().getX509MaterialLocation(username);
+
+    return new HopsSecurityMaterial(userCryptoMaterial.getKeyStoreLocation().toString(),
+        userCryptoMaterial.getKeyStoreMem(),
+        userCryptoMaterial.getKeyStorePass(),
+        userCryptoMaterial.getTrustStoreLocation().toString(),
+        userCryptoMaterial.getTrustStoreMem(),
+        userCryptoMaterial.getTrustStorePass());
+  }
+
+  private HopsSecurityMaterial readClientMaterial() throws IOException {
+    String key = FileUtils.readFileToString(new File(conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+        SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH)));
+    String keyStorePath = conf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY,
+        SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH);
+    ByteBuffer keyStore = ByteBuffer.wrap(FileUtils.readFileToByteArray(new File(keyStorePath)));
+    String trustStorePath = conf.get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY,
+        SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH);
+    ByteBuffer trustStore = ByteBuffer.wrap(FileUtils.readFileToByteArray(new File(trustStorePath)));
+    String userName = getHopsUserName(conf);
+    System.setProperty(io.hops.hadoop.shaded.org.apache.hadoop.security.UserGroupInformation.HADOOP_USER_NAME, userName);
+    return new HopsSecurityMaterial(keyStorePath, keyStore, key, trustStorePath, trustStore, key);
+  }
+
+  private String getHopsUserName(HiveConf conf) throws IOException {
+    String configuredKeystorePath = conf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY,
+        SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH);
+    String configuredPasswordPath = conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+        SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH);
+    // First check in the configured path
+    File localizedKeystore = new File(configuredKeystorePath);
+    File localizedPassword = new File(configuredPasswordPath);
+    if (!localizedKeystore.exists() || !localizedPassword.exists()) {
+
+      // not in configured path search in CWD
+      String keystoreName = Paths.get(configuredKeystorePath).getFileName().toString();
+      String passwordName = Paths.get(configuredPasswordPath).getFileName().toString();
+      // First check in the current working directory
+      localizedKeystore = new File(keystoreName);
+      localizedPassword = null;
+      if (localizedKeystore.exists()) {
+        localizedPassword = new File(keystoreName);
+      } else {
+        // User might have changed directory, use PWD environment variable to construct the full path
+        String pwd = EnvironmentVariablesFactory.getInstance().getEnv("PWD");
+        if (pwd != null) {
+          java.nio.file.Path localizedKeystorePath = Paths.get(pwd, keystoreName);
+          if (!localizedKeystorePath.toFile().exists()) {
+            LOG.error("No crypto material found in PWD");
+            throw new IOException("No crypto material found in PWD");
+          }
+          localizedKeystore = localizedKeystorePath.toFile();
+          localizedPassword = Paths.get(pwd, passwordName).toFile();
+        }
+      }
+    }
+
+    try {
+      String password = HopsUtil.readCryptoMaterialPassword(localizedPassword);
+      KeyStore trustStore = KeyStore.getInstance("JKS");
+      try (FileInputStream fis = new FileInputStream(localizedKeystore)) {
+        trustStore.load(fis, password.toCharArray());
+      }
+
+      Enumeration<String> aliases = trustStore.aliases();
+      while (aliases.hasMoreElements()) {
+        String alias = aliases.nextElement();
+        X509Certificate cert = (X509Certificate) trustStore.getCertificate(alias);
+        String name = HopsUtil.extractCNFromSubject(cert.getSubjectDN().getName());
+        if (name != null) {
+          return name;
+        }
+      }
+    } catch (KeyStoreException | CertificateException | NoSuchAlgorithmException ex) {
+      throw new IOException(ex);
+    }
+    throw new IOException("Did not manage to extract name from certificate");
+  }
+
+  private class HopsSecurityMaterial {
+    private String keyStorePath;
+    private ByteBuffer keyStore;
+    private String keyStorePassword;
+    private String trustStorePath;
+    private ByteBuffer trustStore;
+    private String trustStorePassword;
+
+    HopsSecurityMaterial(String keyStorePath, ByteBuffer keyStore, String keyStorePassword,
+                         String trustStorePath, ByteBuffer trustStore, String trustStorePassword) {
+      this.keyStorePath = keyStorePath;
+      this.keyStore = keyStore;
+      this.keyStorePassword = keyStorePassword;
+      this.trustStorePath = trustStorePath;
+      this.trustStore = trustStore;
+      this.trustStorePassword = trustStorePassword;
+    }
+
+    public String getKeyStorePassword() {
+      return keyStorePassword;
+    }
+
+    public String getKeyStorePath() {
+      return keyStorePath;
+    }
+
+    public String getTrustStorePassword() {
+      return trustStorePassword;
+    }
+
+    public String getTrustStorePath() {
+      return trustStorePath;
+    }
+
+    public ByteBuffer getKeyStore() {
+      return keyStore;
+    }
+
+    public ByteBuffer getTrustStore() {
+      return trustStore;
+    }
+  }
+
+  private class ClientCertUpdater implements Runnable {
+    private HopsSecurityMaterial securityMaterial;
+    private long lastLoaded = -1L;
+
+    ClientCertUpdater(ThriftHiveMetastore.Iface client, HopsSecurityMaterial securityMaterial) {
+      this.securityMaterial = securityMaterial;
+    }
+
+    @Override
+    public void run() {
+      while (!Thread.currentThread().isInterrupted()) {
+        try {
+          Thread.sleep(60000);
+          File trustStore = new File(securityMaterial.getTrustStorePath());
+          if (trustStore.lastModified() != lastLoaded) {
+            securityMaterial = readClientMaterial();
+
+            client.set_crypto(securityMaterial.getKeyStore(), securityMaterial.getKeyStorePassword(),
+                securityMaterial.getTrustStore(), securityMaterial.getTrustStorePassword(), true);
+
+            lastLoaded = trustStore.lastModified();
+          }
+        } catch (Exception e) {
+          // Swallow the exception
+        }
+      }
+    }
   }
 
   private void snapshotActiveConf() {

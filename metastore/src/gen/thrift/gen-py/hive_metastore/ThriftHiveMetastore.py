@@ -976,6 +976,17 @@ class Iface(fb303.FacebookService.Iface):
     """
     pass
 
+  def set_crypto(self, key_store, key_store_password, trust_store, trust_store_password, update):
+    """
+    Parameters:
+     - key_store
+     - key_store_password
+     - trust_store
+     - trust_store_password
+     - update
+    """
+    pass
+
   def get_delegation_token(self, token_owner, renewer_kerberos_principal_name):
     """
     Parameters:
@@ -5518,6 +5529,45 @@ class Client(fb303.FacebookService.Client, Iface):
       raise result.o1
     raise TApplicationException(TApplicationException.MISSING_RESULT, "set_ugi failed: unknown result")
 
+  def set_crypto(self, key_store, key_store_password, trust_store, trust_store_password, update):
+    """
+    Parameters:
+     - key_store
+     - key_store_password
+     - trust_store
+     - trust_store_password
+     - update
+    """
+    self.send_set_crypto(key_store, key_store_password, trust_store, trust_store_password, update)
+    self.recv_set_crypto()
+
+  def send_set_crypto(self, key_store, key_store_password, trust_store, trust_store_password, update):
+    self._oprot.writeMessageBegin('set_crypto', TMessageType.CALL, self._seqid)
+    args = set_crypto_args()
+    args.key_store = key_store
+    args.key_store_password = key_store_password
+    args.trust_store = trust_store
+    args.trust_store_password = trust_store_password
+    args.update = update
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_set_crypto(self):
+    iprot = self._iprot
+    (fname, mtype, rseqid) = iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(iprot)
+      iprot.readMessageEnd()
+      raise x
+    result = set_crypto_result()
+    result.read(iprot)
+    iprot.readMessageEnd()
+    if result.o1 is not None:
+      raise result.o1
+    return
+
   def get_delegation_token(self, token_owner, renewer_kerberos_principal_name):
     """
     Parameters:
@@ -6752,6 +6802,7 @@ class Processor(fb303.FacebookService.Processor, Iface, TProcessor):
     self._processMap["revoke_privileges"] = Processor.process_revoke_privileges
     self._processMap["grant_revoke_privileges"] = Processor.process_grant_revoke_privileges
     self._processMap["set_ugi"] = Processor.process_set_ugi
+    self._processMap["set_crypto"] = Processor.process_set_crypto
     self._processMap["get_delegation_token"] = Processor.process_get_delegation_token
     self._processMap["renew_delegation_token"] = Processor.process_renew_delegation_token
     self._processMap["cancel_delegation_token"] = Processor.process_cancel_delegation_token
@@ -9716,6 +9767,28 @@ class Processor(fb303.FacebookService.Processor, Iface, TProcessor):
       logging.exception(ex)
       result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
     oprot.writeMessageBegin("set_ugi", msg_type, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_set_crypto(self, seqid, iprot, oprot):
+    args = set_crypto_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = set_crypto_result()
+    try:
+      self._handler.set_crypto(args.key_store, args.key_store_password, args.trust_store, args.trust_store_password, args.update)
+      msg_type = TMessageType.REPLY
+    except (TTransport.TTransportException, KeyboardInterrupt, SystemExit):
+      raise
+    except MetaException as o1:
+      msg_type = TMessageType.REPLY
+      result.o1 = o1
+    except Exception as ex:
+      msg_type = TMessageType.EXCEPTION
+      logging.exception(ex)
+      result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+    oprot.writeMessageBegin("set_crypto", msg_type, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -31090,6 +31163,189 @@ class set_ugi_result:
   def __hash__(self):
     value = 17
     value = (value * 31) ^ hash(self.success)
+    value = (value * 31) ^ hash(self.o1)
+    return value
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class set_crypto_args:
+  """
+  Attributes:
+   - key_store
+   - key_store_password
+   - trust_store
+   - trust_store_password
+   - update
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'key_store', None, None, ), # 1
+    (2, TType.STRING, 'key_store_password', None, None, ), # 2
+    (3, TType.STRING, 'trust_store', None, None, ), # 3
+    (4, TType.STRING, 'trust_store_password', None, None, ), # 4
+    (5, TType.BOOL, 'update', None, None, ), # 5
+  )
+
+  def __init__(self, key_store=None, key_store_password=None, trust_store=None, trust_store_password=None, update=None,):
+    self.key_store = key_store
+    self.key_store_password = key_store_password
+    self.trust_store = trust_store
+    self.trust_store_password = trust_store_password
+    self.update = update
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.key_store = iprot.readString()
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.key_store_password = iprot.readString()
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.trust_store = iprot.readString()
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.STRING:
+          self.trust_store_password = iprot.readString()
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.BOOL:
+          self.update = iprot.readBool()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('set_crypto_args')
+    if self.key_store is not None:
+      oprot.writeFieldBegin('key_store', TType.STRING, 1)
+      oprot.writeString(self.key_store)
+      oprot.writeFieldEnd()
+    if self.key_store_password is not None:
+      oprot.writeFieldBegin('key_store_password', TType.STRING, 2)
+      oprot.writeString(self.key_store_password)
+      oprot.writeFieldEnd()
+    if self.trust_store is not None:
+      oprot.writeFieldBegin('trust_store', TType.STRING, 3)
+      oprot.writeString(self.trust_store)
+      oprot.writeFieldEnd()
+    if self.trust_store_password is not None:
+      oprot.writeFieldBegin('trust_store_password', TType.STRING, 4)
+      oprot.writeString(self.trust_store_password)
+      oprot.writeFieldEnd()
+    if self.update is not None:
+      oprot.writeFieldBegin('update', TType.BOOL, 5)
+      oprot.writeBool(self.update)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __hash__(self):
+    value = 17
+    value = (value * 31) ^ hash(self.key_store)
+    value = (value * 31) ^ hash(self.key_store_password)
+    value = (value * 31) ^ hash(self.trust_store)
+    value = (value * 31) ^ hash(self.trust_store_password)
+    value = (value * 31) ^ hash(self.update)
+    return value
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class set_crypto_result:
+  """
+  Attributes:
+   - o1
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRUCT, 'o1', (MetaException, MetaException.thrift_spec), None, ), # 1
+  )
+
+  def __init__(self, o1=None,):
+    self.o1 = o1
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRUCT:
+          self.o1 = MetaException()
+          self.o1.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('set_crypto_result')
+    if self.o1 is not None:
+      oprot.writeFieldBegin('o1', TType.STRUCT, 1)
+      self.o1.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __hash__(self):
+    value = 17
     value = (value * 31) ^ hash(self.o1)
     return value
 

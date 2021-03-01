@@ -138,6 +138,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  bool revoke_privileges(PrivilegeBag privileges)')
   print('  GrantRevokePrivilegeResponse grant_revoke_privileges(GrantRevokePrivilegeRequest request)')
   print('   set_ugi(string user_name,  group_names)')
+  print('  void set_crypto(string key_store, string key_store_password, string trust_store, string trust_store_password, bool update)')
   print('  string get_delegation_token(string token_owner, string renewer_kerberos_principal_name)')
   print('  i64 renew_delegation_token(string token_str_form)')
   print('  void cancel_delegation_token(string token_str_form)')
@@ -926,6 +927,12 @@ elif cmd == 'set_ugi':
     print('set_ugi requires 2 args')
     sys.exit(1)
   pp.pprint(client.set_ugi(args[0],eval(args[1]),))
+
+elif cmd == 'set_crypto':
+  if len(args) != 5:
+    print('set_crypto requires 5 args')
+    sys.exit(1)
+  pp.pprint(client.set_crypto(args[0],args[1],args[2],args[3],eval(args[4]),))
 
 elif cmd == 'get_delegation_token':
   if len(args) != 2:

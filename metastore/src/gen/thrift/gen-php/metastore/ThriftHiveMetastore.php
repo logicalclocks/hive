@@ -980,6 +980,15 @@ interface ThriftHiveMetastoreIf extends \FacebookServiceIf {
    */
   public function set_ugi($user_name, array $group_names);
   /**
+   * @param string $key_store
+   * @param string $key_store_password
+   * @param string $trust_store
+   * @param string $trust_store_password
+   * @param bool $update
+   * @throws \metastore\MetaException
+   */
+  public function set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password, $update);
+  /**
    * @param string $token_owner
    * @param string $renewer_kerberos_principal_name
    * @return string
@@ -7826,6 +7835,61 @@ class ThriftHiveMetastoreClient extends \FacebookServiceClient implements \metas
       throw $result->o1;
     }
     throw new \Exception("set_ugi failed: unknown result");
+  }
+
+  public function set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password, $update)
+  {
+    $this->send_set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password, $update);
+    $this->recv_set_crypto();
+  }
+
+  public function send_set_crypto($key_store, $key_store_password, $trust_store, $trust_store_password, $update)
+  {
+    $args = new \metastore\ThriftHiveMetastore_set_crypto_args();
+    $args->key_store = $key_store;
+    $args->key_store_password = $key_store_password;
+    $args->trust_store = $trust_store;
+    $args->trust_store_password = $trust_store_password;
+    $args->update = $update;
+    $bin_accel = ($this->output_ instanceof TBinaryProtocolAccelerated) && function_exists('thrift_protocol_write_binary');
+    if ($bin_accel)
+    {
+      thrift_protocol_write_binary($this->output_, 'set_crypto', TMessageType::CALL, $args, $this->seqid_, $this->output_->isStrictWrite());
+    }
+    else
+    {
+      $this->output_->writeMessageBegin('set_crypto', TMessageType::CALL, $this->seqid_);
+      $args->write($this->output_);
+      $this->output_->writeMessageEnd();
+      $this->output_->getTransport()->flush();
+    }
+  }
+
+  public function recv_set_crypto()
+  {
+    $bin_accel = ($this->input_ instanceof TBinaryProtocolAccelerated) && function_exists('thrift_protocol_read_binary');
+    if ($bin_accel) $result = thrift_protocol_read_binary($this->input_, '\metastore\ThriftHiveMetastore_set_crypto_result', $this->input_->isStrictRead());
+    else
+    {
+      $rseqid = 0;
+      $fname = null;
+      $mtype = 0;
+
+      $this->input_->readMessageBegin($fname, $mtype, $rseqid);
+      if ($mtype == TMessageType::EXCEPTION) {
+        $x = new TApplicationException();
+        $x->read($this->input_);
+        $this->input_->readMessageEnd();
+        throw $x;
+      }
+      $result = new \metastore\ThriftHiveMetastore_set_crypto_result();
+      $result->read($this->input_);
+      $this->input_->readMessageEnd();
+    }
+    if ($result->o1 !== null) {
+      throw $result->o1;
+    }
+    return;
   }
 
   public function get_delegation_token($token_owner, $renewer_kerberos_principal_name)
@@ -38344,6 +38408,250 @@ class ThriftHiveMetastore_set_ugi_result {
       }
       $xfer += $output->writeFieldEnd();
     }
+    if ($this->o1 !== null) {
+      $xfer += $output->writeFieldBegin('o1', TType::STRUCT, 1);
+      $xfer += $this->o1->write($output);
+      $xfer += $output->writeFieldEnd();
+    }
+    $xfer += $output->writeFieldStop();
+    $xfer += $output->writeStructEnd();
+    return $xfer;
+  }
+
+}
+
+class ThriftHiveMetastore_set_crypto_args {
+  static $_TSPEC;
+
+  /**
+   * @var string
+   */
+  public $key_store = null;
+  /**
+   * @var string
+   */
+  public $key_store_password = null;
+  /**
+   * @var string
+   */
+  public $trust_store = null;
+  /**
+   * @var string
+   */
+  public $trust_store_password = null;
+  /**
+   * @var bool
+   */
+  public $update = null;
+
+  public function __construct($vals=null) {
+    if (!isset(self::$_TSPEC)) {
+      self::$_TSPEC = array(
+        1 => array(
+          'var' => 'key_store',
+          'type' => TType::STRING,
+          ),
+        2 => array(
+          'var' => 'key_store_password',
+          'type' => TType::STRING,
+          ),
+        3 => array(
+          'var' => 'trust_store',
+          'type' => TType::STRING,
+          ),
+        4 => array(
+          'var' => 'trust_store_password',
+          'type' => TType::STRING,
+          ),
+        5 => array(
+          'var' => 'update',
+          'type' => TType::BOOL,
+          ),
+        );
+    }
+    if (is_array($vals)) {
+      if (isset($vals['key_store'])) {
+        $this->key_store = $vals['key_store'];
+      }
+      if (isset($vals['key_store_password'])) {
+        $this->key_store_password = $vals['key_store_password'];
+      }
+      if (isset($vals['trust_store'])) {
+        $this->trust_store = $vals['trust_store'];
+      }
+      if (isset($vals['trust_store_password'])) {
+        $this->trust_store_password = $vals['trust_store_password'];
+      }
+      if (isset($vals['update'])) {
+        $this->update = $vals['update'];
+      }
+    }
+  }
+
+  public function getName() {
+    return 'ThriftHiveMetastore_set_crypto_args';
+  }
+
+  public function read($input)
+  {
+    $xfer = 0;
+    $fname = null;
+    $ftype = 0;
+    $fid = 0;
+    $xfer += $input->readStructBegin($fname);
+    while (true)
+    {
+      $xfer += $input->readFieldBegin($fname, $ftype, $fid);
+      if ($ftype == TType::STOP) {
+        break;
+      }
+      switch ($fid)
+      {
+        case 1:
+          if ($ftype == TType::STRING) {
+            $xfer += $input->readString($this->key_store);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
+        case 2:
+          if ($ftype == TType::STRING) {
+            $xfer += $input->readString($this->key_store_password);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
+        case 3:
+          if ($ftype == TType::STRING) {
+            $xfer += $input->readString($this->trust_store);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
+        case 4:
+          if ($ftype == TType::STRING) {
+            $xfer += $input->readString($this->trust_store_password);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
+        case 5:
+          if ($ftype == TType::BOOL) {
+            $xfer += $input->readBool($this->update);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
+        default:
+          $xfer += $input->skip($ftype);
+          break;
+      }
+      $xfer += $input->readFieldEnd();
+    }
+    $xfer += $input->readStructEnd();
+    return $xfer;
+  }
+
+  public function write($output) {
+    $xfer = 0;
+    $xfer += $output->writeStructBegin('ThriftHiveMetastore_set_crypto_args');
+    if ($this->key_store !== null) {
+      $xfer += $output->writeFieldBegin('key_store', TType::STRING, 1);
+      $xfer += $output->writeString($this->key_store);
+      $xfer += $output->writeFieldEnd();
+    }
+    if ($this->key_store_password !== null) {
+      $xfer += $output->writeFieldBegin('key_store_password', TType::STRING, 2);
+      $xfer += $output->writeString($this->key_store_password);
+      $xfer += $output->writeFieldEnd();
+    }
+    if ($this->trust_store !== null) {
+      $xfer += $output->writeFieldBegin('trust_store', TType::STRING, 3);
+      $xfer += $output->writeString($this->trust_store);
+      $xfer += $output->writeFieldEnd();
+    }
+    if ($this->trust_store_password !== null) {
+      $xfer += $output->writeFieldBegin('trust_store_password', TType::STRING, 4);
+      $xfer += $output->writeString($this->trust_store_password);
+      $xfer += $output->writeFieldEnd();
+    }
+    if ($this->update !== null) {
+      $xfer += $output->writeFieldBegin('update', TType::BOOL, 5);
+      $xfer += $output->writeBool($this->update);
+      $xfer += $output->writeFieldEnd();
+    }
+    $xfer += $output->writeFieldStop();
+    $xfer += $output->writeStructEnd();
+    return $xfer;
+  }
+
+}
+
+class ThriftHiveMetastore_set_crypto_result {
+  static $_TSPEC;
+
+  /**
+   * @var \metastore\MetaException
+   */
+  public $o1 = null;
+
+  public function __construct($vals=null) {
+    if (!isset(self::$_TSPEC)) {
+      self::$_TSPEC = array(
+        1 => array(
+          'var' => 'o1',
+          'type' => TType::STRUCT,
+          'class' => '\metastore\MetaException',
+          ),
+        );
+    }
+    if (is_array($vals)) {
+      if (isset($vals['o1'])) {
+        $this->o1 = $vals['o1'];
+      }
+    }
+  }
+
+  public function getName() {
+    return 'ThriftHiveMetastore_set_crypto_result';
+  }
+
+  public function read($input)
+  {
+    $xfer = 0;
+    $fname = null;
+    $ftype = 0;
+    $fid = 0;
+    $xfer += $input->readStructBegin($fname);
+    while (true)
+    {
+      $xfer += $input->readFieldBegin($fname, $ftype, $fid);
+      if ($ftype == TType::STOP) {
+        break;
+      }
+      switch ($fid)
+      {
+        case 1:
+          if ($ftype == TType::STRUCT) {
+            $this->o1 = new \metastore\MetaException();
+            $xfer += $this->o1->read($input);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
+        default:
+          $xfer += $input->skip($ftype);
+          break;
+      }
+      $xfer += $input->readFieldEnd();
+    }
+    $xfer += $input->readStructEnd();
+    return $xfer;
+  }
+
+  public function write($output) {
+    $xfer = 0;
+    $xfer += $output->writeStructBegin('ThriftHiveMetastore_set_crypto_result');
     if ($this->o1 !== null) {
       $xfer += $output->writeFieldBegin('o1', TType::STRUCT, 1);
       $xfer += $this->o1->write($output);

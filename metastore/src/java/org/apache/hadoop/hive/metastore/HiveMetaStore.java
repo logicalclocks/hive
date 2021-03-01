@@ -5830,6 +5830,12 @@ public class HiveMetaStore extends ThriftHiveMetastore {
     }
 
     @Override
+    public void set_crypto(ByteBuffer keyStore, String keyStorePassword,
+                           ByteBuffer trustStore, String trustStorePassword, boolean update) throws MetaException {
+      // no-op as this branch is used only for clients
+    }
+
+    @Override
     public boolean partition_name_has_valid_characters(List<String> part_vals,
         boolean throw_exception) throws TException, MetaException {
       startFunction("partition_name_has_valid_characters");

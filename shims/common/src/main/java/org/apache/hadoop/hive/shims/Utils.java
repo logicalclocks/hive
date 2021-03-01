@@ -59,7 +59,8 @@ public class Utils {
       .contains("IBM");
 
   public static UserGroupInformation getUGI() throws LoginException, IOException {
-    String doAs = System.getenv("HADOOP_USER_NAME");
+    String doAs =
+        System.getProperty(io.hops.hadoop.shaded.org.apache.hadoop.security.UserGroupInformation.HADOOP_USER_NAME);
     if(doAs != null && doAs.length() > 0) {
      /*
       * this allows doAs (proxy user) to be passed along across process boundary where
