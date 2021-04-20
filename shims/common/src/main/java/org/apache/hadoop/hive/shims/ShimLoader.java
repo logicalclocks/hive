@@ -170,11 +170,14 @@ public abstract class ShimLoader {
           " (expected A.B.* format)");
     }
 
-    switch (Integer.parseInt(parts[0])) {
-    case 2:
-      return HADOOP23VERSIONNAME;
-    default:
-      throw new IllegalArgumentException("Unrecognized Hadoop major version number: " + vers);
+    Integer majorVersion = Integer.parseInt(parts[0]);
+    switch (majorVersion) {
+      case 2:
+      case 3:
+        return HADOOP23VERSIONNAME;
+      default:
+        throw new IllegalArgumentException("This is the new jar - Unrecognized Hadoop major version number: " + vers
+            + " major version: " + majorVersion);
     }
   }
 

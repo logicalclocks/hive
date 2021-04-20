@@ -444,10 +444,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   private void open() throws MetaException {
     isConnected = false;
     TTransportException tte = null;
-    boolean hopsTLS = conf.getBoolean(
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
-    boolean useSasl = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_SASL);
+    boolean hopsTLS = true;
+    boolean useSasl = false;
     boolean useFramedTransport = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_FRAMED_TRANSPORT);
     boolean useCompactProtocol = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_COMPACT_PROTOCOL);
     int clientSocketTimeout = (int) conf.getTimeVar(
@@ -535,7 +533,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
             }
           }
 
-          if (isConnected && !useSasl && conf.getBoolVar(ConfVars.METASTORE_EXECUTE_SET_UGI)){
+          if (isConnected){
             // Call set_ugi, only in unsecure mode.
             try {
               UserGroupInformation ugi = Utils.getUGI();
