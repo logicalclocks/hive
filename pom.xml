@@ -17,7 +17,7 @@
 
   <groupId>io.hops.hive</groupId>
   <artifactId>hive</artifactId>
-  <version>3.0.0.6</version>
+  <version>3.0.0.7</version>
   <packaging>pom</packaging>
 
   <name>Hive</name>
@@ -39,6 +39,7 @@
     <module>hcatalog</module>
     <module>hplsql</module>
     <module>jdbc</module>
+    <module>hops-jdbc</module>
     <module>metastore</module>
     <module>ql</module>
     <module>cli</module>
