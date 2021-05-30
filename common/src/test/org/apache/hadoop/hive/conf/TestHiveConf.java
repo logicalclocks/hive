@@ -208,7 +208,8 @@ public class TestHiveConf {
   @Test
   public void testLoadSSLServer() throws Exception {
     Configuration hadoopConf = writeSSLServer();
-    HiveConf conf = new HiveConf(hadoopConf, TestHiveConf.class, false);
+    hadoopConf.setBoolean("hive.load.ssl-server", true);
+    HiveConf conf = new HiveConf(hadoopConf, TestHiveConf.class);
 
     Assert.assertEquals("ssl.test", conf.get("ssl.test"));
   }
@@ -216,7 +217,8 @@ public class TestHiveConf {
   @Test
   public void testNoSSLServerForClient() throws Exception {
     Configuration hadoopConf = writeSSLServer();
-    HiveConf conf = new HiveConf(hadoopConf, TestHiveConf.class, true);
+    hadoopConf.setBoolean("hive.load.ssl-server", false);
+    HiveConf conf = new HiveConf(hadoopConf, TestHiveConf.class);
 
     Assert.assertNull(conf.get("ssl.test"));
   }
