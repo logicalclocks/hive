@@ -19,12 +19,12 @@
 
   <groupId>io.hops.hive</groupId>
   <artifactId>hive-standalone-metastore</artifactId>
-  <version>3.0.0.7</version>
+  <version>3.0.0.8-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Hive Standalone Metastore</name>
 
   <properties>
-    <hive.version.shortname>3.0.0.7</hive.version.shortname>
+    <hive.version.shortname>3.0.0.8</hive.version.shortname>
 
     <!-- Build properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

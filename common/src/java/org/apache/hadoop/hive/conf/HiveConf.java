@@ -3160,6 +3160,7 @@ public class HiveConf extends Configuration {
         "Port number of HiveServer2 Thrift interface when hive.server2.transport.mode is 'binary'."),
     HIVE_SERVER2_THRIFT_PORT_2WSSL("hive.server2.thrift.port.ssl", 9999,
         "Port number of HiveServer2 Thrift interface when hive.server2.transport.mode is 'binary' and SSL two way."),
+    HIVE_LOAD_SSL_SERVER("hive.load.ssl-server", false, "True to load the ssl-server.xml from the classpath"),
     HIVE_SERVER2_THRIFT_SASL_QOP("hive.server2.thrift.sasl.qop", "auth",
         new StringSet("auth", "auth-int", "auth-conf"),
         "Sasl QOP value; set it to one of following values to enable higher levels of\n" +
@@ -5090,38 +5091,17 @@ public class HiveConf extends Configuration {
 
   public HiveConf() {
     super();
-    initialize(this.getClass(), false);
-  }
-
-  // Hops related code. Call this method from within a client.
-  // This method will not try to load the ssl-server.xml
-  public HiveConf(boolean client) {
-    super();
-    initialize(this.getClass(), client);
+    initialize(this.getClass());
   }
 
   public HiveConf(Class<?> cls) {
     super();
-    initialize(cls, false);
-  }
-
-  // Hops related code. Call this method from within a client.
-  // This method will not try to load the ssl-server.xml
-  public HiveConf(Class<?> cls, boolean client) {
-    super();
-    initialize(cls, client);
+    initialize(cls);
   }
 
   public HiveConf(Configuration other, Class<?> cls) {
     super(other);
-    initialize(cls, false);
-  }
-
-  // Hops related code. Call this method from within a client.
-  // This method will not try to load the ssl-server.xml
-  public HiveConf(Configuration other, Class<?> cls, boolean client) {
-    super(other);
-    initialize(cls, client);
+    initialize(cls);
   }
 
   /**
@@ -5152,7 +5132,7 @@ public class HiveConf extends Configuration {
     return p;
   }
 
-  private void initialize(Class<?> cls, boolean client) {
+  private void initialize(Class<?> cls) {
     hiveJar = (new JobConf(cls)).getJar();
 
     // preserve the original configuration
@@ -5195,7 +5175,7 @@ public class HiveConf extends Configuration {
     }
 
     // Load ssl-server.xml (in HADOOP_CONF_DIR) if we are not in the context of a client
-    if (!client) {
+    if (this.getBoolVar(ConfVars.HIVE_LOAD_SSL_SERVER)) {
       String resource = get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml");
       URL resourceURL = ClassLoader.getSystemResource(resource);
       if (resourceURL != null && (new File(resourceURL.getPath()).canRead())) {
