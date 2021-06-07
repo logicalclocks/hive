@@ -292,6 +292,14 @@
                   </artifactSet>
                   <relocations>
                     <relocation>
+                      <pattern>org.apache.hive</pattern>
+                      <shadedPattern>io.hops.hive</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>org.apache.hadoop.hive</pattern>
+                      <shadedPattern>io.hops.hadoop.hive</shadedPattern>
+                    </relocation>
+                    <relocation>
                       <pattern>org.apache.http</pattern>
                       <shadedPattern>org.apache.hive.org.apache.http</shadedPattern>
                     </relocation>
@@ -306,6 +314,14 @@
                     <relocation>
                       <pattern>org.apache.commons</pattern>
                       <shadedPattern>org.apache.hive.org.apache.commons</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>org.apache.logging.log4j</pattern>
+                      <shadedPattern>org.apache.hive.org.apache.logging.log4j</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>org.apache.logging.slf4j</pattern>
+                      <shadedPattern>org.apache.hive.org.apache.logging.slf4j</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.apache.log4j</pattern>
