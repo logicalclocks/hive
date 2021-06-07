@@ -568,6 +568,9 @@ public class HiveConnection implements java.sql.Connection {
     return transport;
   }
 
+  // This method is copied from the HiveAuthUtils class so that we don't need to have
+  // our version of hive-common deployed, but we can rely on the one provided
+  // as in the case of the newer (spark 3.x) Databricks runtimes
   private static TTransport get2WayTLSClientSocket(String host, int port, int loginTimeout,
                                                   String trustStorePath, String trustStorePassword, String keyStorePath,
                                                   String keyStorePassword) throws TTransportException {
