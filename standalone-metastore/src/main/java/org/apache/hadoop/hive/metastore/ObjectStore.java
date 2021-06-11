@@ -2227,11 +2227,7 @@ public class ObjectStore implements RawStore, Configurable {
     }
 
     URI uri = URI.create(location);
-    try {
-      return new URI(uri.getScheme(), whAuthority, uri.getPath(), uri.getQuery(), uri.getFragment()).toString();
-    } catch (URISyntaxException ex) {
-      throw new MetaException(ex.getMessage());
-    }
+    return location.replaceFirst(uri.getAuthority(), whAuthority);
   }
 
   private MCreationMetadata convertToMCreationMetadata(
