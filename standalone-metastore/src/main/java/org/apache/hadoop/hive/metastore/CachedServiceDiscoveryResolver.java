@@ -15,11 +15,9 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,10 +55,8 @@ public class CachedServiceDiscoveryResolver {
           .findAny()
           .orElseThrow(() -> new MetaException("Service Discovery is enabled but could not resolve domain " + uri.getHost()));
 
-      return new URI(uri.getScheme(), uri.getUserInfo(), nn.getAddress(), uri.getPort(), uri.getPath(),
-              uri.getQuery(), uri.getFragment()).toString();
-
-    } catch (ServiceDiscoveryException | URISyntaxException ex) {
+      return locationURI.replaceFirst(uri.getHost(), nn.getAddress());
+    } catch (ServiceDiscoveryException ex) {
       String msg = "Could not resolve NameNode service with Service Discovery";
       LOG.warn(msg, ex);
       throw new MetaException(ex.getMessage() != null ? ex.getMessage() : msg);
