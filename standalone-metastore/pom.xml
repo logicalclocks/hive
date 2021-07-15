@@ -19,12 +19,12 @@
 
   <groupId>io.hops.hive</groupId>
   <artifactId>hive-standalone-metastore</artifactId>
-  <version>3.0.0.8</version>
+  <version>3.0.0.9</version>
   <packaging>jar</packaging>
   <name>Hive Standalone Metastore</name>
 
   <properties>
-    <hive.version.shortname>3.0.0.8</hive.version.shortname>
+    <hive.version.shortname>3.0.0.9</hive.version.shortname>
 
     <!-- Build properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -65,7 +65,7 @@
     <dropwizard-metrics-hadoop-metrics2-reporter.version>0.1.2</dropwizard-metrics-hadoop-metrics2-reporter.version>
     <dropwizard.version>3.1.0</dropwizard.version>
     <guava.version>19.0</guava.version>
-    <hadoop.version>3.2.0.1-SNAPSHOT</hadoop.version>
+    <hadoop.version>3.2.0.5-SNAPSHOT</hadoop.version>
     <hikaricp.version>2.6.1</hikaricp.version>
     <jackson.version>2.9.4</jackson.version>
     <javolution.version>5.5.1</javolution.version>
