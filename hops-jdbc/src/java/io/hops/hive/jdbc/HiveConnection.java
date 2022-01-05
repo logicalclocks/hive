@@ -62,6 +62,7 @@ import org.apache.http.ssl.SSLContexts;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.THttpClient;
+import org.apache.thrift.transport.TSSLTransportFactory;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
@@ -553,7 +554,7 @@ public class HiveConnection implements java.sql.Connection {
         if (useTwoWaySSL != null && useTwoWaySSL.equalsIgnoreCase(JdbcConnectionParams.TRUE)) {
           String sslKeyStore = sessConfMap.get(JdbcConnectionParams.SSL_KEY_STORE);
           String sslKeyStorePassword = sessConfMap.get(JdbcConnectionParams.SSL_KEY_STORE_PASSWORD);
-          transport = HiveAuthUtils.get2WayTLSClientSocket(host, port, loginTimeout,
+          transport = get2WayTLSClientSocket(host, port, loginTimeout,
               sslTrustStore, sslTrustStorePassword, sslKeyStore, sslKeyStorePassword);
         } else {
           transport = HiveAuthUtils.getTLSClientSocket(host, port, loginTimeout,
@@ -565,6 +566,20 @@ public class HiveConnection implements java.sql.Connection {
       transport = HiveAuthUtils.getSocketTransport(host, port, loginTimeout);
     }
     return transport;
+  }
+
+  // This method is copied from the HiveAuthUtils class so that we don't need to have
+  // our version of hive-common deployed, but we can rely on the one provided
+  // as in the case of the newer (spark 3.x) Databricks runtimes
+  private static TTransport get2WayTLSClientSocket(String host, int port, int loginTimeout,
+                                                  String trustStorePath, String trustStorePassword, String keyStorePath,
+                                                  String keyStorePassword) throws TTransportException {
+    TSSLTransportFactory.TSSLTransportParameters params =
+        new TSSLTransportFactory.TSSLTransportParameters();
+
+    params.setTrustStore(trustStorePath, trustStorePassword);
+    params.setKeyStore(keyStorePath, keyStorePassword);
+    return TSSLTransportFactory.getClientSocket(host, port, loginTimeout, params);
   }
 
   /**
