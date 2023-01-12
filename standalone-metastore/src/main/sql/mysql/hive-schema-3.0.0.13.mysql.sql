@@ -1173,7 +1173,7 @@ CREATE INDEX IDX_RUNTIME_STATS_CREATE_TIME ON RUNTIME_STATS(CREATE_TIME);
 -- -----------------------------------------------------------------
 -- Record schema version. Should be the last step in the init script
 -- -----------------------------------------------------------------
-INSERT INTO VERSION (VER_ID, SCHEMA_VERSION, VERSION_COMMENT) VALUES (1, '3.0.0.12', 'Hive release version 3.0.0.12');
+INSERT INTO VERSION (VER_ID, SCHEMA_VERSION, VERSION_COMMENT) VALUES (1, '3.0.0.13', 'Hive release version 3.0.0.13');
 
 
 /*!40101 SET character_set_client = @saved_cs_client */;
