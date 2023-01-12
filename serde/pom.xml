@@ -19,7 +19,7 @@
   <parent>
     <groupId>io.hops.hive</groupId>
     <artifactId>hive</artifactId>
-    <version>3.0.0.12</version>
+    <version>3.0.0.13-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
@@ -76,8 +76,8 @@
       <version>${hppc.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.vlkan</groupId>
-      <artifactId>flatbuffers</artifactId>
+      <groupId>com.google.flatbuffers</groupId>
+      <artifactId>flatbuffers-java</artifactId>
       <version>${flatbuffers.version}</version>
     </dependency>
     <dependency>
