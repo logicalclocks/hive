@@ -128,7 +128,7 @@ public class SampleTezSessionState extends WmTezSession {
       public void onFailure(Throwable t) {
         future.setException(t);
       }
-    });
+    }, timeoutPool);
     return future;
   }
 
