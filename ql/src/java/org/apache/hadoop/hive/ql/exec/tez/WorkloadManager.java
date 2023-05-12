@@ -1093,7 +1093,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
   }
 
   private void failOnFutureFailure(ListenableFuture<?> future) {
-    Futures.addCallback(future, FATAL_ERROR_CALLBACK);
+    Futures.addCallback(future, FATAL_ERROR_CALLBACK, workPool);
   }
 
   private void queueGetRequestOnMasterThread(
@@ -1926,7 +1926,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
 
     public void start() throws Exception {
       ListenableFuture<WmTezSession> getFuture = tezAmPool.getSessionAsync();
-      Futures.addCallback(getFuture, this);
+      Futures.addCallback(getFuture, this, workPool);
     }
 
     @Override
@@ -1980,7 +1980,7 @@ public class WorkloadManager extends TezSessionPoolSession.AbstractTriggerValida
       case GETTING: {
         ListenableFuture<WmTezSession> waitFuture = session.waitForAmRegistryAsync(
             amRegistryTimeoutMs, timeoutPool);
-        Futures.addCallback(waitFuture, this);
+        Futures.addCallback(waitFuture, this, workPool);
         break;
       }
       case WAITING_FOR_REGISTRY: {
