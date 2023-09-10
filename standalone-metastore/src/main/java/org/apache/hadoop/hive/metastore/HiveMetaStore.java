@@ -78,15 +78,13 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.hops.leader_election.watchdog.AliveWatchdogService;
 import io.hops.security.CertificateLocalizationCtx;
 import io.hops.security.CertificateLocalizationService;
 
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.api.*;
 import org.apache.hadoop.hive.metastore.events.AddForeignKeyEvent;
@@ -226,6 +224,8 @@ public class HiveMetaStore extends ThriftHiveMetastore {
 
   public static final String NO_FILTER_STRING = "";
   public static final int UNLIMITED_MAX_PARTITIONS = -1;
+
+  private static AliveWatchdogService aliveWatchdogService;
 
   private static final class ChainedTTransportFactory extends TTransportFactory {
     private final TTransportFactory parentTransFactory;
@@ -8763,13 +8763,20 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         LogUtils.initHiveLog4j(conf);
       } else {
         //reconfigure log4j after settings via hiveconf are write into System Properties
-        LoggerContext context =  (LoggerContext)LogManager.getContext(false);
-        context.reconfigure();
+        //LoggerContext context =  (LoggerContext)LogManager.getContext(false);
+        //context.reconfigure();
       }
     } catch (LogUtils.LogInitializationException e) {
       HMSHandler.LOG.warn(e.getMessage());
     }
     startupShutdownMessage(HiveMetaStore.class, args, LOG);
+
+    if (conf.getBoolean(CommonConfigurationKeys.ALIVE_WATCHDOG_ENABLED,
+            CommonConfigurationKeys.ALIVE_WATCHDOG_ENABLED_DEFAULT)) {
+      aliveWatchdogService = new AliveWatchdogService();
+      aliveWatchdogService.serviceInit(conf);
+      aliveWatchdogService.serviceStart();
+    }
 
     try {
       String msg = "Starting hive metastore on port " + cli.port;
@@ -8967,6 +8974,9 @@ public class HiveMetaStore extends ThriftHiveMetastore {
             String shutdownMsg = "Shutting down the CertificateLocalizationService.";
             HMSHandler.LOG.info(shutdownMsg);
             certLocService.stop();
+            if (aliveWatchdogService != null) {
+              aliveWatchdogService.stop();
+            }
           }, 10);
         }
 
