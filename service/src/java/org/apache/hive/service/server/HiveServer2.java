@@ -34,6 +34,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.hops.leader_election.watchdog.AliveWatchdogService;
 import io.hops.security.CertificateLocalizationCtx;
 import io.hops.security.CertificateLocalizationService;
 import org.apache.commons.cli.GnuParser;
@@ -57,6 +58,7 @@ import org.apache.curator.framework.recipes.leader.LeaderLatch;
 import org.apache.curator.framework.recipes.leader.LeaderLatchListener;
 import org.apache.curator.framework.recipes.nodes.PersistentEphemeralNode;
 import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JvmPauseMonitor;
@@ -134,6 +136,7 @@ public class HiveServer2 extends CompositeService {
   private static final Logger LOG = LoggerFactory.getLogger(HiveServer2.class);
   public static final String INSTANCE_URI_CONFIG = "hive.server2.instance.uri";
   private static final int SHUTDOWN_TIME = 60;
+  private static AliveWatchdogService aliveWatchdogService;
   private CLIService cliService;
   private ArrayList<Service> thriftCLIServices;
   private PersistentEphemeralNode znode;
@@ -997,6 +1000,10 @@ public class HiveServer2 extends CompositeService {
       certLocService.stop();
     }
 
+    if (aliveWatchdogService != null) {
+      aliveWatchdogService.stop();
+    }
+
     if (zKClientForPrivSync != null) {
       zKClientForPrivSync.close();
     }
@@ -1056,9 +1063,17 @@ public class HiveServer2 extends CompositeService {
 
   private static void startHiveServer2() throws Throwable {
     long attempts = 0, maxAttempts = 1;
+    HiveConf hiveConf = new HiveConf();
+
+    if (hiveConf.getBoolean(CommonConfigurationKeys.ALIVE_WATCHDOG_ENABLED,
+            CommonConfigurationKeys.ALIVE_WATCHDOG_ENABLED_DEFAULT)) {
+      aliveWatchdogService = new AliveWatchdogService();
+      aliveWatchdogService.serviceInit(hiveConf);
+      aliveWatchdogService.serviceStart();
+    }
+
     while (true) {
       LOG.info("Starting HiveServer2");
-      HiveConf hiveConf = new HiveConf();
       maxAttempts = hiveConf.getLongVar(HiveConf.ConfVars.HIVE_SERVER2_MAX_START_ATTEMPTS);
       long retrySleepIntervalMs = hiveConf
           .getTimeVar(ConfVars.HIVE_SERVER2_SLEEP_INTERVAL_BETWEEN_START_ATTEMPTS,
