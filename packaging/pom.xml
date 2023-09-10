@@ -205,16 +205,6 @@
     </dependency>
     <dependency>
       <groupId>io.hops.hive</groupId>
-      <artifactId>hive-hbase-handler</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.hops.hive</groupId>
-      <artifactId>hive-druid-handler</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.hops.hive</groupId>
       <artifactId>hive-jdbc-handler</artifactId>
       <version>${project.version}</version>
     </dependency>
