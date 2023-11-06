@@ -943,7 +943,7 @@ public class ObjectStore implements RawStore, Configurable {
 
   private Catalog mCatToCat(MCatalog mCat) throws MetaException {
     Catalog cat = new Catalog(mCat.getName(), mCat.getSd() != null ?
-            serviceDiscoveryClient.resolveLocationURI(mCat.getSd().getLocation()) : null);
+            serviceDiscoveryClient.resolveLocationURI(enforceWhAuthority(mCat.getSd().getLocation())) : null);
     if (mCat.getDescription() != null) {
       cat.setDescription(mCat.getDescription());
     }
@@ -1060,7 +1060,7 @@ public class ObjectStore implements RawStore, Configurable {
     db.setName(mdb.getName());
     db.setDescription(mdb.getDescription());
     if (resolveHostname) {
-      db.setLocationUri(serviceDiscoveryClient.resolveLocationURI(mdb.getSd().getLocation()));
+      db.setLocationUri(serviceDiscoveryClient.resolveLocationURI(enforceWhAuthority(mdb.getSd().getLocation())));
     } else {
       db.setLocationUri(mdb.getSd().getLocation());
     }
@@ -2097,7 +2097,8 @@ public class ObjectStore implements RawStore, Configurable {
     List<MFieldSchema> mFieldSchemas = msd.getCD() == null ? null : msd.getCD().getCols();
 
     StorageDescriptor sd = new StorageDescriptor(noFS ? null : convertToFieldSchemas(mFieldSchemas),
-        resolveHostname ? serviceDiscoveryClient.resolveLocationURI(msd.getLocation()) : msd.getLocation(),
+        resolveHostname ? serviceDiscoveryClient.resolveLocationURI(enforceWhAuthority(msd.getLocation())) :
+                enforceWhAuthority(msd.getLocation()),
         msd.getInputFormat(), msd.getOutputFormat(), msd.isCompressed(),
         msd.getNumBuckets(), convertToSerDeInfo(msd.getSerDeInfo()),
         convertList(msd.getBucketCols()), convertToOrders(msd.getSortCols()),
