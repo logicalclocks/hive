@@ -1,0 +1,9 @@
+rules:
+  - pattern: 'metrics<name=([\w\.\-]*)><>(.*): (\d+)'
+    name: hs2_$1
+    value: $3
+    labels:
+        scope: $2
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+    attrNameSnakeCase: true

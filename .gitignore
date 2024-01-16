@@ -32,3 +32,4 @@ itests/hive-blobstore/src/test/resources/blobstore-conf.xml
 Makefile
 patchprocess
 standalone-metastore/src/gen/version
+wgetrc
