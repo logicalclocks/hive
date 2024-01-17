@@ -31,6 +31,7 @@ This folder contains the files we copy to the image when building
 - Create a devconf folder and copy there the `/srv/hops/apache-hive/conf` folder. The hive-env.sh might be in conflict with the env of the Docker container, thus, it might be better to avoid copying it.
 - There might be issues by mounting the certs and the users/groups of the container. To solve this, change the ownership of those so the container can run.
 
+
 ## Run container in dev env
 
 - Stop the hivemetastore service in the vm `systemctl stop hivemetastore`
