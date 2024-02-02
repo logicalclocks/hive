@@ -4,6 +4,9 @@ ARG HADOOP_VERSION_EE=3.2.0.12-EE-SNAPSHOT
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG USER="hive"
 ARG GROUP="hive"
+ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
+ARG MYSQL_CONNECTOR_VERSION="8.0.21"
+ARG HUDI_BUNDLE_VERSION="0.12.3.0"
 
 # This is for local dev in the VM
 RUN groupadd -g 1505 $GROUP && \
@@ -46,17 +49,13 @@ ENV PATH="/srv/hops/super_crypto/hive:$HIVE_HOME/bin:/opt/venv/bin:$HADOOP_HOME/
 
 
 # Download extra jars
-# FIXME: this should come from our own repo
 ENV HOPSWORKS_JARS=/srv/hops/hopsworks-jars
 RUN mkdir -p ${HOPSWORKS_JARS}
-ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
-RUN wget -O ${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar  https://repo.maven.apache.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/${PROMETHEUS_EXPORTER_VERSION}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar
+# https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-0.12.0.jar
+RUN wget -O ${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar
+# https://repo.hops.works/master/mysql-connector-java-8.0.21-bin.jar
+RUN wget -O ${HOPSWORKS_JARS}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar https://repo.hops.works/master/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar
 
-ARG MYSQL_CONNECTOR_VERSION="8.0.21"
-RUN wget -O ${HOPSWORKS_JARS}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar  https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.21/mysql-connector-java-8.0.21.jar
-
-
-ARG HUDI_BUNDLE_VERSION="0.12.3.0"
 RUN wget -O ${HOPSWORKS_JARS}/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar  http://archiva.hops.works/repository/Hops/io/hops/hudi/hudi-hadoop-mr-bundle/$HUDI_BUNDLE_VERSION/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar
 
 
