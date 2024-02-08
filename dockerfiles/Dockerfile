@@ -3,20 +3,18 @@ ARG HIVE_VERSION=3.0.0.13.3
 ARG HADOOP_VERSION_EE=3.2.0.12-EE-SNAPSHOT
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG USER="hive"
-ARG USERID="1515"
-ARG GROUP="hive"
-ARG GROUPID="1505"
+ARG USERID="1516"
 ARG HADOOP_GROUP_ID="1234"
-ARG METASTORE_ID="1511"
+ARG METASERVER_ID="1505"
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG MYSQL_CONNECTOR_VERSION="8.0.21"
 ARG HUDI_BUNDLE_VERSION="0.12.3.0"
 
 # This is for local dev in the VM
-RUN groupadd -g $GROUPID $GROUP && \
-    useradd -m --uid $USERID --gid $GROUPID $USER
-RUN groupadd -g ${METASTORE_ID} metastore && \
-    usermod -a -G metastore $USER
+RUN useradd -m --uid $USERID  $USER
+
+RUN groupadd -g ${METASERVER_ID} metaserver && \
+    usermod -a -G metaserver $USER
 RUN groupadd -g ${HADOOP_GROUP_ID} hadoop && \
     usermod -a -G hadoop $USER
     
@@ -66,7 +64,7 @@ RUN wget -O ${HOPSWORKS_JARS}/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar  ht
 ENV METASTORE_XMX=2g
 ENV METASTORE_XMS=2g
 ENV HOPSWORKS_JARS=/srv/hops/hopsworks-jars
-ENV HIVE_METASTORE_HADOOP_OPTS="-Xmx${METASTORE_XMX} -Xms${METASTORE_XMS} -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=65 -XX:+UseCMSInitiatingOccupancyOnly -javaagent:${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar=18002:${HIVE_HOME}/conf/hivemetastore.yaml -Djdk.tls.ephemeralDHKeySize=2048 -Dlog4j2.formatMsgNoLookups=true"
+ENV HIVE_METASTORE_HADOOP_OPTS="-Xmx${METASTORE_XMX} -Xms${METASTORE_XMS} -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=65 -XX:+UseCMSInitiatingOccupancyOnly -javaagent:${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar=18002:${HIVE_HOME}/conf/hivemetaserver.yaml -Djdk.tls.ephemeralDHKeySize=2048 -Dlog4j2.formatMsgNoLookups=true"
 ENV HIVE_AUX_JARS_PATH=$HOPSWORKS_JARS
 # ENV HIVESERVER2_HADOOP_OPTS='-Djava.io.tmpdir=/tmp/$HIVE_USER'
 
