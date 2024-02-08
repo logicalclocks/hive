@@ -70,12 +70,12 @@ ENV HIVE_AUX_JARS_PATH=$HOPSWORKS_JARS
 
 
 RUN mkdir -p /home/$USER
-RUN chown $USER:$GROUP /home/$USER
+RUN chown $USER /home/$USER
 
 WORKDIR /home/$USER
 COPY dockerfiles/entrypoint.sh entrypoint.sh
-RUN chown $USER:$GROUP  entrypoint.sh 
-RUN chown -R $USER:$GROUP $HIVE_HOME
+RUN chown $USER  entrypoint.sh 
+RUN chown -R $USER $HIVE_HOME
 USER $USER
 
 ENTRYPOINT [ "./entrypoint.sh" ]
