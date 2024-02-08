@@ -1,9 +1,12 @@
+# syntax=docker/dockerfile:experimental
 FROM openjdk:8
 ARG HIVE_VERSION=3.0.0.13.3
 ARG HADOOP_VERSION_EE=3.2.0.12-EE-SNAPSHOT
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG USER="hive"
 ARG USERID="1516"
+ARG HADOOP_GROUP_NAME="hadoop"
+ARG METASERVER_GROUP_NAME="metaserver"
 ARG HADOOP_GROUP_ID="1234"
 ARG METASERVER_ID="1505"
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
@@ -13,10 +16,10 @@ ARG HUDI_BUNDLE_VERSION="0.12.3.0"
 # This is for local dev in the VM
 RUN useradd -m --uid $USERID  $USER
 
-RUN groupadd -g ${METASERVER_ID} metaserver && \
-    usermod -a -G metaserver $USER
-RUN groupadd -g ${HADOOP_GROUP_ID} hadoop && \
-    usermod -a -G hadoop $USER
+RUN groupadd -g ${METASERVER_ID} ${METASERVER_GROUP_NAME} && \
+    usermod -a -G ${METASERVER_GROUP_NAME} $USER
+RUN groupadd -g ${HADOOP_GROUP_ID} ${HADOOP_GROUP_NAME} && \
+    usermod -a -G ${HADOOP_GROUP_NAME} $USER
     
 
 
@@ -70,12 +73,12 @@ ENV HIVE_AUX_JARS_PATH=$HOPSWORKS_JARS
 
 
 RUN mkdir -p /home/$USER
-RUN chown $USER /home/$USER
+RUN chown $USER:${HADOOP_GROUP_NAME} /home/$USER
 
 WORKDIR /home/$USER
 COPY dockerfiles/entrypoint.sh entrypoint.sh
 RUN chown $USER  entrypoint.sh 
-RUN chown -R $USER $HIVE_HOME
+RUN chown -R $USER:${HADOOP_GROUP_NAME} $HIVE_HOME
 USER $USER
 
 ENTRYPOINT [ "./entrypoint.sh" ]
