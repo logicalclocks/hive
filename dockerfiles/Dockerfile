@@ -3,17 +3,21 @@ ARG HIVE_VERSION=3.0.0.13.3
 ARG HADOOP_VERSION_EE=3.2.0.12-EE-SNAPSHOT
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG USER="hive"
+ARG USERID="1515"
 ARG GROUP="hive"
+ARG GROUPID="1505"
+ARG HADOOP_GROUP_ID="1234"
+ARG METASTORE_ID="1511"
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG MYSQL_CONNECTOR_VERSION="8.0.21"
 ARG HUDI_BUNDLE_VERSION="0.12.3.0"
 
 # This is for local dev in the VM
-RUN groupadd -g 1505 $GROUP && \
-    useradd -m --uid 1515 --gid 1505 $USER
-RUN groupadd -g 1511 metastore && \
+RUN groupadd -g $GROUPID $GROUP && \
+    useradd -m --uid $USERID --gid $GROUPID $USER
+RUN groupadd -g ${METASTORE_ID} metastore && \
     usermod -a -G metastore $USER
-RUN groupadd -g 1234 hadoop && \
+RUN groupadd -g ${HADOOP_GROUP_ID} hadoop && \
     usermod -a -G hadoop $USER
     
 
