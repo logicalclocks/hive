@@ -16,7 +16,7 @@ node("local") {
           def builder = new ImageBuilder(this)
 
           sh "printf user=$USERNAME\npassword=$PASSWORD > $WORKSPACE/dockerfiles/wgetrc"
-          sh "ls $WORKSPACE/dockerfile"
+          sh "ls $WORKSPACE/dockerfiles"
 
           m = readFile "${env.WORKSPACE}/dockerfiles/build-manifest.json"
           builder.run(m)
