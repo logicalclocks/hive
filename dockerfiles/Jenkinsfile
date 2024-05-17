@@ -10,8 +10,12 @@ node("local") {
 
     stage('Build and push image(s)') {
       withCredentials([usernamePassword(credentialsId: 'a0770738-4ef3-4acc-a6ba-097ee6c85b44', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
-        version = readFile "${env.WORKSPACE}/dockerfiles/HIVE_VERSION"
-        releasedVersion = version - "-SNAPSHOT"
+        sh """
+              mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -Ev 'Download|INFO|WARNING' > version.log
+              export VERSION=\$(cat version.log)
+              echo -n \$VERSION > version.log
+        """
+        version = readFile "${env.WORKSPACE}/version.log"
         withEnv(["HOPSWORKS_VERSION=${version.trim()}", ]) {
           def builder = new ImageBuilder(this)
 
