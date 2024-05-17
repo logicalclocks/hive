@@ -14,6 +14,7 @@ node("local") {
               mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -Ev 'Download|INFO|WARNING' > version.log
               export VERSION=\$(cat version.log)
               echo -n \$VERSION > version.log
+              echo \$VERSION
         """
         version = readFile "${env.WORKSPACE}/version.log"
         withEnv(["HOPSWORKS_VERSION=${version.trim()}", ]) {
