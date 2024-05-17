@@ -84,7 +84,7 @@ RUN mkdir -p /home/$USER
 RUN chown $USER:${HADOOP_GROUP_NAME} /home/$USER
 
 WORKDIR /home/$USER
-COPY dockerfiles/entrypoint.sh entrypoint.sh
+COPY entrypoint.sh entrypoint.sh
 RUN chown $USER  entrypoint.sh 
 RUN chown -R $USER:${HADOOP_GROUP_NAME} $HIVE_HOME
 USER $USER

@@ -1,0 +1,31 @@
+@Library("jenkins-library@main")
+
+import com.logicalclocks.jenkins.k8s.ImageBuilder
+
+
+node("local") {
+    stage('Clone repository') {
+      checkout scm
+    }
+
+    stage('Build and push image(s)') {
+      withCredentials([usernamePassword(credentialsId: 'a0770738-4ef3-4acc-a6ba-097ee6c85b44', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
+        sh """
+              mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -Ev 'Download|INFO|WARNING' > version.log
+              export VERSION=\$(cat version.log)
+              echo -n \$VERSION > version.log
+              echo \$VERSION
+        """
+        version = readFile "${env.WORKSPACE}/version.log"
+        withEnv(["HOPSWORKS_VERSION=${version.trim()}", ]) {
+          def builder = new ImageBuilder(this)
+
+          sh "printf \"user=$USERNAME\npassword=$PASSWORD\" > $WORKSPACE/dockerfiles/wgetrc"
+          sh "ls $WORKSPACE/dockerfiles"
+
+          m = readFile "${env.WORKSPACE}/dockerfiles/build-manifest.json"
+          builder.run(m)
+        }
+      }
+    }
+}
