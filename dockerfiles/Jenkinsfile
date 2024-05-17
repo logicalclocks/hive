@@ -15,9 +15,7 @@ node("local") {
         withEnv(["HOPSWORKS_VERSION=${version.trim()}", ]) {
           def builder = new ImageBuilder(this)
 
-          sh '''
-            printf "user=$USERNAME\npassword=$PASSWORD > $WORKSPACE/dockerfiles/wgetrc
-          '''
+          sh "printf "user=$USERNAME\npassword=$PASSWORD > $WORKSPACE/dockerfiles/wgetrc"
 
           m = readFile "${env.WORKSPACE}/dockerfiles/build-manifest.json"
           builder.run(m)
