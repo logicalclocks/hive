@@ -34,6 +34,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -692,12 +693,14 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
   }
 
   private HopsSecurityMaterial readClientMaterial() throws IOException {
-    String key = FileUtils.readFileToString(new File("material_passwd"));
-    ByteBuffer keyStore = ByteBuffer.wrap(FileUtils.readFileToByteArray(new File("k_certificate")));
-    ByteBuffer trustStore = ByteBuffer.wrap(FileUtils.readFileToByteArray(new File("t_certificate")));
-
-    return new HopsSecurityMaterial("k_certificate", keyStore, key,
-        "t_certificate", trustStore, key);
+    String key = FileUtils.readFileToString(new File(System.getenv("MATERIAL_DIRECTORY"), "material_passwd"));
+    ByteBuffer keyStore = ByteBuffer.wrap(FileUtils.readFileToByteArray(new File(
+            System.getenv("MATERIAL_DIRECTORY"), "k_certificate")));
+    ByteBuffer trustStore = ByteBuffer.wrap(FileUtils.readFileToByteArray(new File(
+            System.getenv("MATERIAL_DIRECTORY"), "t_certificate")));
+    String keystorePath = Paths.get(System.getenv("MATERIAL_DIRECTORY"), new String[] { "k_certificate" }).toString();
+    String trustStorePath = Paths.get(System.getenv("MATERIAL_DIRECTORY"), new String[] { "t_certificate" }).toString();
+    return new HopsSecurityMaterial(keystorePath, keyStore, key, trustStorePath, trustStore, key);
   }
 
   public class HopsSecurityMaterial {
