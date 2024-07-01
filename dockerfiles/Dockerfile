@@ -1,28 +1,20 @@
 # syntax=docker/dockerfile:experimental
 FROM openjdk:8
-ARG HIVE_VERSION=3.0.0.13.3
+ARG HIVE_VERSION=3.0.0.13.5
 ARG HADOOP_VERSION_EE=3.2.0.12-EE-SNAPSHOT
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
-ARG USER="hive"
-ARG USERID="1516"
-ARG HADOOP_GROUP_NAME="hadoop"
-ARG METASERVER_GROUP_NAME="metaserver"
-ARG HADOOP_GROUP_ID="1234"
-ARG METASERVER_ID="1505"
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG MYSQL_CONNECTOR_VERSION="8.0.21"
 ARG HUDI_BUNDLE_VERSION="0.12.3.0"
 ARG TEZ_VERSION="0.9.1.5"
 
-# This is for local dev in the VM
-RUN useradd -m --uid $USERID  $USER
+ARG USER="hive"
+ARG USERID="1516"
+ARG HADOOP_GROUP_NAME="hadoop"
+ARG HADOOP_GROUP_ID="1234"
 
-RUN groupadd -g ${METASERVER_ID} ${METASERVER_GROUP_NAME} && \
-    usermod -a -G ${METASERVER_GROUP_NAME} $USER
 RUN groupadd -g ${HADOOP_GROUP_ID} ${HADOOP_GROUP_NAME} && \
-    usermod -a -G ${HADOOP_GROUP_NAME} $USER
-    
-
+    useradd -m --uid ${USERID} --gid ${HADOOP_GROUP_ID} ${USER}
 
 # Download HADOOP
 RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \

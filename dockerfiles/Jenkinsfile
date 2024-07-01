@@ -17,7 +17,7 @@ node("local") {
               echo \$VERSION
         """
         version = readFile "${env.WORKSPACE}/version.log"
-        withEnv(["HOPSWORKS_VERSION=${version.trim()}", ]) {
+        withEnv(["HIVE_VERSION=${version.trim()}", ]) {
           def builder = new ImageBuilder(this)
 
           sh "printf \"user=$USERNAME\npassword=$PASSWORD\" > $WORKSPACE/dockerfiles/wgetrc"

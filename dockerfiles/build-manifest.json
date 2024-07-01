@@ -1,8 +1,11 @@
 [
     {
         "name": "hopsworks/hive",
-        "version": "env:HOPSWORKS_VERSION",
+        "version": "env:HIVE_VERSION",
+        "variables": [
+          "HIVE_VERSION"
+        ],
         "dockerFile": "dockerfiles/Dockerfile",
-        "extraDockerArgs": "--secret id=wgetrc,src=wgetrc"
+        "extraDockerArgs": "--secret id=wgetrc,src=wgetrc --build-arg HIVE_VERSION=${HIVE_VERSION}"
     }
 ]
