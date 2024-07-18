@@ -41,6 +41,7 @@ RUN wget https://archiva.hops.works/repository/Hops/io/hops/hive/hive-packaging/
     ln -s /srv/hops/apache-hive-$HIVE_VERSION-bin /srv/hops/hive && \
     rm hive-packaging-$HIVE_VERSION-bin.tar.gz
 
+RUN rm -rf /srv/hops/hive/conf/*
 RUN chown ${USER}:${HADOOP_GROUP_NAME} -R /srv/hops/apache-hive-$HIVE_VERSION-bin
 
 ENV HIVE_HOME=/srv/hops/hive
