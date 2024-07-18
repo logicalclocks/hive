@@ -1,6 +1,6 @@
 [
     {
-        "name": "hopsworks/hive",
+        "name": "mahmoud/hopsworks/hive",
         "version": "env:HIVE_VERSION",
         "variables": [
           "HIVE_VERSION"
