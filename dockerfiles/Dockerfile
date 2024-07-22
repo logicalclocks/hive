@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:experimental
 FROM openjdk:8
 ARG HIVE_VERSION=3.0.0.13.5
-ARG HADOOP_VERSION_EE=3.2.0.12-EE-SNAPSHOT
+ARG HADOOP_VERSION_EE=3.2.0.14-EE-SNAPSHOT
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG MYSQL_CONNECTOR_VERSION="8.0.21"
@@ -41,6 +41,8 @@ RUN wget https://archiva.hops.works/repository/Hops/io/hops/hive/hive-packaging/
     ln -s /srv/hops/apache-hive-$HIVE_VERSION-bin /srv/hops/hive && \
     rm hive-packaging-$HIVE_VERSION-bin.tar.gz
 
+RUN rm -rf /srv/hops/hive/conf/*
+RUN chown ${USER}:${HADOOP_GROUP_NAME} -R /srv/hops/apache-hive-$HIVE_VERSION-bin
 
 ENV HIVE_HOME=/srv/hops/hive
 ENV PATH="/srv/hops/super_crypto/hive:$HIVE_HOME/bin:/opt/venv/bin:$HADOOP_HOME/bin:$PATH"
