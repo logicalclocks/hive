@@ -42,7 +42,7 @@ RUN wget https://archiva.hops.works/repository/Hops/io/hops/hive/hive-packaging/
     rm hive-packaging-$HIVE_VERSION-bin.tar.gz
 
 RUN rm -rf /srv/hops/hive/conf/*
-RUN chown ${USER}:${HADOOP_GROUP_NAME} -R /srv/hops/apache-hive-$HIVE_VERSION-bin
+RUN chmod -R 755 -R /srv/hops/apache-hive-$HIVE_VERSION-bin
 
 ENV HIVE_HOME=/srv/hops/hive
 ENV PATH="/srv/hops/super_crypto/hive:$HIVE_HOME/bin:/opt/venv/bin:$HADOOP_HOME/bin:$PATH"
@@ -57,6 +57,8 @@ RUN wget -O ${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VER
 # https://repo.hops.works/master/mysql-connector-java-8.0.21-bin.jar
 RUN wget -O ${HOPSWORKS_JARS}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar https://repo.hops.works/master/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar
 
+RUN chmod -R 755 ${HOPSWORKS_JARS}
+
 RUN wget -O ${HOPSWORKS_JARS}/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar  http://archiva.hops.works/repository/Hops/io/hops/hudi/hudi-hadoop-mr-bundle/$HUDI_BUNDLE_VERSION/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar
 
 RUN mkdir -p $TEZ_JARS && \
@@ -65,6 +67,8 @@ RUN mkdir -p ${TEZ_JARS}/apache-tez-${TEZ_VERSION} \
      && tar -C $TEZ_JARS/apache-tez-${TEZ_VERSION} -zxf ${TEZ_JARS}/apache-tez-${TEZ_VERSION}.tar.gz \
      && ln -s ${TEZ_JARS}/apache-tez-${TEZ_VERSION} /srv/hops/apache-tez
 ENV TEZ_JARS=/srv/hops/apache-tez
+
+RUN chmod 755 $TEZ_JARS
 
 ENV METASTORE_XMX=2g
 ENV METASTORE_XMS=2g
@@ -77,10 +81,17 @@ ENV HIVE_AUX_JARS_PATH=$HOPSWORKS_JARS
 RUN mkdir -p /home/$USER
 RUN chown $USER:${HADOOP_GROUP_NAME} /home/$USER
 
-WORKDIR /home/$USER
-COPY entrypoint.sh entrypoint.sh
-RUN chown $USER  entrypoint.sh 
-RUN chown -R $USER:${HADOOP_GROUP_NAME} $HIVE_HOME
+RUN mkdir -p $HIVE_HOME/scripts
+
+COPY entrypoint.sh $HIVE_HOME/scripts/entrypoint.sh
+RUN chmod -R 755 $HIVE_HOME/scripts && \
+    mkdir -p $HIVE_HOME/conf && \
+    chmod -R 777 $HIVE_HOME/conf && \
+    mkdir -p $HIVE_HOME/logs && \
+    chmod -R 777 $HIVE_HOME/logs
+
 USER $USER
 
-ENTRYPOINT [ "./entrypoint.sh" ]
+WORKDIR $HIVE_HOME
+
+ENTRYPOINT [ "./scripts/entrypoint.sh" ]
