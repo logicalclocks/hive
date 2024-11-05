@@ -186,7 +186,7 @@
     <repository>
       <id>HopsEE</id>
       <name>Hops EE Repo</name>
-      <url>https://nexus.hops.works/repository/hops-artifacts</url>
+      <url>https://nexus.hops.works/repository/hive-artifacts</url>
     </repository>
   </distributionManagement>
 </project>
