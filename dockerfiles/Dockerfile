@@ -36,7 +36,8 @@ ENV HADOOP_CONF_DIR="$HADOOP_HOME/conf"
 
 # Download hive
 # https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/3.0.0.13.7/hive-packaging-3.0.0.13.7-bin.tar.gz
-RUN wget https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/$HIVE_VERSION/hive-packaging-$HIVE_VERSION-bin.tar.gz && \
+RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
+    wget https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/$HIVE_VERSION/hive-packaging-$HIVE_VERSION-bin.tar.gz && \
     tar -C /srv/hops/ -zxf hive-packaging-$HIVE_VERSION-bin.tar.gz && \
     ln -s /srv/hops/apache-hive-$HIVE_VERSION-bin /srv/hops/hive && \
     rm hive-packaging-$HIVE_VERSION-bin.tar.gz
