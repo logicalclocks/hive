@@ -19,7 +19,7 @@
 
   <groupId>io.hops.hive</groupId>
   <artifactId>hive-standalone-metastore</artifactId>
-  <version>3.0.0.13.7</version>
+  <version>3.0.0.13.8</version>
   <packaging>jar</packaging>
   <name>Hive Standalone Metastore</name>
 
