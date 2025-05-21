@@ -12,8 +12,8 @@ This folder contains the files we copy to the image when building
 **Note** we are downloading the hive packaging from the hopsworks [archiva](https://archiva.hops.works/#welcome). This is way easier than building inside docker.
 
 - User: `hive`
-- HIVE_VERSION: `3.0.0.13.8`. This should come automatically from reading the pom file
-- HADOOP_VERSION_EE: `3.2.0.16-EE-RC0`
+- HIVE_VERSION: `3.0.0.13.9`. This should come automatically from reading the pom file
+- HADOOP_VERSION_EE: `3.2.0.17-EE-SNAPSHOT`
 - PROMETHEUS_EXPORTER_VERSION: '0.12.0'
 - MYSQL_CONNECTOR_VERSION: '8.0.21'
 - HUDI_BUNDLE_VERSION: '0.12.3.0'
