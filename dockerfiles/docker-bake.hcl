@@ -1,5 +1,5 @@
-variable "VERSION" {
-  default = "3.0.0.13.8"
+variable "HIVE_VERSION" {
+  default = "$HIVE_VERSION"
 }
 
 variable "REGISTRY" {
@@ -24,8 +24,8 @@ target "hive" {
     output = ["type=registry"]
     attest = ["type=sbom"]
     tags = [
-        "${REGISTRY}/${REGISTRY_PROJECT}/hive:${VERSION}",
-        "${REGISTRY}/${REGISTRY_PROJECT}/hive:${VERSION}-${COMMIT_HASH}",
+        "${REGISTRY}/${REGISTRY_PROJECT}/hive:${HIVE_VERSION}",
+        "${REGISTRY}/${REGISTRY_PROJECT}/hive:${HIVE_VERSION}-${COMMIT_HASH}",
         "${REGISTRY}/${REGISTRY_PROJECT}/hive:${JIRA_TAG}",
     ]
     cache-from= ["type=registry,ref=${REGISTRY}/${REGISTRY_PROJECT}/hive:cache-${JIRA_TAG}"]
