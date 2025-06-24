@@ -11,11 +11,11 @@ variable "REGISTRY_PROJECT" {
 }
 
 variable "COMMIT_HASH" {
-  default = "latest"
+  default = "$COMMIT_HASH"
 }
 
 variable "JIRA_TAG" {
-  default = "NOJIRA"
+  default = "$JIRA_TAG"
 }
 
 
