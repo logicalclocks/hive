@@ -23,6 +23,9 @@ target "hive" {
     platforms = ["linux/amd64"]
     output = ["type=registry"]
     attest = ["type=sbom"]
+    args = {
+        HIVE_VERSION = "${HIVE_VERSION}",
+    }
     tags = [
         "${REGISTRY}/${REGISTRY_PROJECT}/hive:${HIVE_VERSION}",
         "${REGISTRY}/${REGISTRY_PROJECT}/hive:${HIVE_VERSION}-${COMMIT_HASH}",
