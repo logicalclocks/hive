@@ -19,7 +19,7 @@ RUN groupadd -g ${HADOOP_GROUP_ID} ${HADOOP_GROUP_NAME} && \
 # Download HADOOP
 RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
     mkdir -p /srv/hops && \
-    wget https://nexus.hops.works/repository/hopshadoop/hops-$HADOOP_VERSION_EE.tgz && \
+    wget -q https://nexus.hops.works/repository/hopshadoop/hops-$HADOOP_VERSION_EE.tgz && \
     tar -C /srv/hops/ -zxf hops-$HADOOP_VERSION_EE.tgz && \
     ln -s /srv/hops/hadoop-$HADOOP_VERSION_EE /srv/hops/hadoop && \
     rm -rf /srv/hops/hadoop/etc && \
@@ -37,7 +37,7 @@ ENV HADOOP_CONF_DIR="$HADOOP_HOME/conf"
 # Download hive
 # https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/3.0.0.13.9/hive-packaging-3.0.0.13.9-bin.tar.gz
 RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
-    wget https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/$HIVE_VERSION/hive-packaging-$HIVE_VERSION-bin.tar.gz && \
+    wget -q https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/$HIVE_VERSION/hive-packaging-$HIVE_VERSION-bin.tar.gz && \
     tar -C /srv/hops/ -zxf hive-packaging-$HIVE_VERSION-bin.tar.gz && \
     ln -s /srv/hops/apache-hive-$HIVE_VERSION-bin /srv/hops/hive && \
     rm hive-packaging-$HIVE_VERSION-bin.tar.gz
@@ -54,13 +54,13 @@ ENV HOPSWORKS_JARS=/srv/hops/hopsworks-jars
 ENV TEZ_JARS=/srv/hops/tez-jars
 RUN mkdir -p ${HOPSWORKS_JARS}
 # https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-0.12.0.jar
-RUN wget -O ${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar
+RUN wget -qO ${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar
 # https://repo.hops.works/master/mysql-connector-java-8.0.21-bin.jar
-RUN wget -O ${HOPSWORKS_JARS}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar https://repo.hops.works/master/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar
+RUN wget -qO ${HOPSWORKS_JARS}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar https://repo.hops.works/master/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-bin.jar
 
 RUN chmod -R 755 ${HOPSWORKS_JARS}
 
-RUN wget -O ${HOPSWORKS_JARS}/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar  http://archiva.hops.works/repository/Hops/io/hops/hudi/hudi-hadoop-mr-bundle/$HUDI_BUNDLE_VERSION/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar
+RUN wget -qO ${HOPSWORKS_JARS}/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar  http://archiva.hops.works/repository/Hops/io/hops/hudi/hudi-hadoop-mr-bundle/$HUDI_BUNDLE_VERSION/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar
 
 RUN mkdir -p $TEZ_JARS && \
      wget -O ${TEZ_JARS}/apache-tez-${TEZ_VERSION}.tar.gz  https://repo.hops.works/master/apache-tez-${TEZ_VERSION}.tar.gz
