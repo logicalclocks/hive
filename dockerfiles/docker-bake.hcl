@@ -18,6 +18,7 @@ variable "JIRA_TAG" {
   default = "NOJIRA"
 }
 
+
 target "hive" {
     dockerfile = "./Dockerfile"
     platforms = ["linux/amd64"]
