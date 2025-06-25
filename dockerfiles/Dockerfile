@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:experimental
 FROM openjdk:8
 ARG HIVE_VERSION=3.0.0.13.6
+ARG NEXUS_HIVE_URL="https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging"
 ARG HADOOP_VERSION_EE=3.2.0.17-EE-SNAPSHOT
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
@@ -37,7 +38,7 @@ ENV HADOOP_CONF_DIR="$HADOOP_HOME/conf"
 # Download hive
 # https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/3.0.0.13.9/hive-packaging-3.0.0.13.9-bin.tar.gz
 RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
-    wget -q https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/$HIVE_VERSION/hive-packaging-$HIVE_VERSION-bin.tar.gz && \
+    wget -q ${NEXUS_HIVE_URL}/$HIVE_VERSION/hive-packaging-$HIVE_VERSION-bin.tar.gz && \
     tar -C /srv/hops/ -zxf hive-packaging-$HIVE_VERSION-bin.tar.gz && \
     ln -s /srv/hops/apache-hive-$HIVE_VERSION-bin /srv/hops/hive && \
     rm hive-packaging-$HIVE_VERSION-bin.tar.gz
