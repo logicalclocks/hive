@@ -2,6 +2,10 @@ variable "HIVE_VERSION" {
   default = "$HIVE_VERSION"
 }
 
+variable "NEXUS_HIVE_URL" {
+  default = "$NEXUS_HIVE_URL"
+}
+
 variable "REGISTRY" {
   default = "$REGISTRY"
 }
@@ -26,6 +30,7 @@ target "hive" {
     attest = ["type=sbom"]
     args = {
         HIVE_VERSION = "${HIVE_VERSION}",
+        NEXUS_HIVE_URL = "${NEXUS_HIVE_URL}",
     }
     tags = [
         "${REGISTRY}/${REGISTRY_PROJECT}/hive:${HIVE_VERSION}",
