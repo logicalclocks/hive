@@ -6,6 +6,10 @@ variable "NEXUS_HIVE_URL" {
   default = "$NEXUS_HIVE_URL"
 }
 
+variable "HIVE_TAR_NAME" {
+  default = "$HIVE_TAR_NAME"
+}
+
 variable "REGISTRY" {
   default = "$REGISTRY"
 }
@@ -31,6 +35,7 @@ target "hive" {
     args = {
         HIVE_VERSION = "${HIVE_VERSION}",
         NEXUS_HIVE_URL = "${NEXUS_HIVE_URL}",
+        HIVE_TAR_NAME = "${HIVE_TAR_NAME}",
     }
     tags = [
         "${REGISTRY}/${REGISTRY_PROJECT}/hive:${HIVE_VERSION}",
