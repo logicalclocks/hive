@@ -38,12 +38,12 @@ target "hive" {
         HIVE_TAR_NAME = "${HIVE_TAR_NAME}",
     }
     tags = [
-        "${REGISTRY}/${REGISTRY_PROJECT}/hive:${HIVE_VERSION}",
-        "${REGISTRY}/${REGISTRY_PROJECT}/hive:${HIVE_VERSION}-${COMMIT_HASH}",
-        "${REGISTRY}/${REGISTRY_PROJECT}/hive:${JIRA_TAG}",
+        "${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:${HIVE_VERSION}",
+        "${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:${HIVE_VERSION}-${COMMIT_HASH}",
+        "${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:${JIRA_TAG}",
     ]
-    cache-from= ["type=registry,ref=${REGISTRY}/${REGISTRY_PROJECT}/hive:cache-${JIRA_TAG}"]
-    cache-to = ["type=registry,ref=${REGISTRY}/${REGISTRY_PROJECT}/hive:cache-${JIRA_TAG},mode=max,image-manifest=true"]
+    cache-from= ["type=registry,ref=${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:cache-${JIRA_TAG}"]
+    cache-to = ["type=registry,ref=${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:cache-${JIRA_TAG},mode=max,image-manifest=true"]
     secret = ["id=wgetrc,src=./.wgetrc"]
 }
 
