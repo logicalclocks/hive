@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
 FROM openjdk:8
-ARG HIVE_VERSION=3.0.0.13.6
+ARG HIVE_VERSION=3.0.0.14.0
 ARG HIVE_TAR_NAME=hive-packaging-${HIVE_VERSION}-bin.tar.gz
 ARG NEXUS_HIVE_URL="https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging"
 ARG HADOOP_VERSION_EE=3.2.0.17-EE-SNAPSHOT
@@ -37,7 +37,7 @@ ENV HADOOP_HOME=/srv/hops/hadoop
 ENV HADOOP_CONF_DIR="$HADOOP_HOME/conf"
 
 # Download hive
-# https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/3.0.0.13.9/hive-packaging-3.0.0.13.9-bin.tar.gz
+# https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/3.0.0.14.0/hive-packaging-3.0.0.14.0-bin.tar.gz
 RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
     wget -q ${NEXUS_HIVE_URL}/$HIVE_VERSION/${HIVE_TAR_NAME} && \
     tar -C /srv/hops/ -zxf ${HIVE_TAR_NAME} && \
