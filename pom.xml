@@ -17,7 +17,7 @@
 
   <groupId>io.hops.hive</groupId>
   <artifactId>hive</artifactId>
-  <version>3.0.0.13.9</version>
+  <version>3.0.0.14.0</version>
   <packaging>pom</packaging>
 
   <name>Hive</name>
