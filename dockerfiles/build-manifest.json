@@ -2,6 +2,9 @@
     {
         "name": "hopsworks/hive",
         "version": "env:HIVE_VERSION",
+        "platforms": {
+            "append": ["linux/arm64"]
+        },
         "variables": [
           "HIVE_VERSION"
         ],
