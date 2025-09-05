@@ -139,7 +139,7 @@
     <dropwizard.version>3.1.0</dropwizard.version>
     <dropwizard-metrics-hadoop-metrics2-reporter.version>0.1.2</dropwizard-metrics-hadoop-metrics2-reporter.version>
     <druid.version>0.12.0</druid.version>
-    <flatbuffers.version>1.9.0</flatbuffers.version>
+    <flatbuffers.version>24.3.25</flatbuffers.version>
     <guava.version>27.0-jre</guava.version>
     <groovy.version>2.4.11</groovy.version>
     <hadoop.version>3.2.0.17-EE-SNAPSHOT</hadoop.version>
