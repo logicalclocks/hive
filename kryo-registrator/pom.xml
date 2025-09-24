@@ -20,7 +20,7 @@
   <parent>
     <artifactId>hive</artifactId>
     <groupId>io.hops.hive</groupId>
-    <version>3.0.0.13.10-SNAPSHOT</version>
+    <version>3.0.0.13.10</version>
   </parent>
 
   <artifactId>hive-kryo-registrator</artifactId>
