@@ -20,7 +20,7 @@
   <parent>
     <groupId>io.hops.hive</groupId>
     <artifactId>hive</artifactId>
-    <version>3.0.0.13.10</version>
+    <version>3.0.0.13.11</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
