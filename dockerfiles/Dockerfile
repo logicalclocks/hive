@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:experimental
-FROM openjdk:8
+FROM eclipse-temurin:8
 ARG HIVE_VERSION=3.0.0.13.6
 ARG HIVE_TAR_NAME=hive-packaging-${HIVE_VERSION}-bin.tar.gz
 ARG NEXUS_HIVE_URL="https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging"
@@ -31,7 +31,6 @@ RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
 # Make sure you build with --platform linux/amd64
 
 # /usr/local/openjdk-8/bin/java
-ENV JAVA_HOME=/usr/local/openjdk-8
 RUN mkdir -p /usr/lib/jvm &&  ln -s $JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
 ENV HADOOP_HOME=/srv/hops/hadoop
 ENV HADOOP_CONF_DIR="$HADOOP_HOME/conf"
