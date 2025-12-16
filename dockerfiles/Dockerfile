@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
-FROM openjdk:8
-ARG HIVE_VERSION=3.0.0.13.6
+FROM eclipse-temurin:8
+ARG HIVE_VERSION
 ARG HIVE_TAR_NAME=hive-packaging-${HIVE_VERSION}-bin.tar.gz
 ARG NEXUS_HIVE_URL="https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging"
 ARG HADOOP_VERSION_EE=3.2.0.17-EE-RC1
@@ -31,13 +31,12 @@ RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
 # Make sure you build with --platform linux/amd64
 
 # /usr/local/openjdk-8/bin/java
-ENV JAVA_HOME=/usr/local/openjdk-8
 RUN mkdir -p /usr/lib/jvm &&  ln -s $JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
 ENV HADOOP_HOME=/srv/hops/hadoop
 ENV HADOOP_CONF_DIR="$HADOOP_HOME/conf"
 
 # Download hive
-# https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/3.0.0.13.10/hive-packaging-3.0.0.13.10-bin.tar.gz
+# https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/${HIVE_VERSION}/hive-packaging-${HIVE_VERSION}-bin.tar.gz
 RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
     wget -q ${NEXUS_HIVE_URL}/$HIVE_VERSION/${HIVE_TAR_NAME} && \
     tar -C /srv/hops/ -zxf ${HIVE_TAR_NAME} && \
