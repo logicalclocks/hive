@@ -76,6 +76,14 @@
       <version>2.5</version>
     </dependency>
     <dependency>
+      <groupId>org.codehaus.jackson</groupId>
+      <artifactId>jackson-core-asl</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.jackson</groupId>
+      <artifactId>jackson-mapper-asl</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.orc</groupId>
       <artifactId>orc-core</artifactId>
       <exclusions>
