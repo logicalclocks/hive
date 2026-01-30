@@ -8,7 +8,6 @@ ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG MYSQL_CONNECTOR_VERSION="8.0.21"
 ARG HUDI_BUNDLE_VERSION="0.12.3.0"
-ARG TEZ_VERSION="0.9.1.5"
 
 ARG USER="hive"
 ARG USERID="1516"
@@ -52,7 +51,6 @@ ENV PATH="/srv/hops/super_crypto/hive:$HIVE_HOME/bin:/opt/venv/bin:$HADOOP_HOME/
 
 # Download extra jars
 ENV HOPSWORKS_JARS=/srv/hops/hopsworks-jars
-ENV TEZ_JARS=/srv/hops/tez-jars
 RUN mkdir -p ${HOPSWORKS_JARS}
 # https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-0.12.0.jar
 RUN wget -qO ${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar
@@ -62,15 +60,6 @@ RUN wget -qO ${HOPSWORKS_JARS}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}-b
 RUN chmod -R 755 ${HOPSWORKS_JARS}
 
 RUN wget -qO ${HOPSWORKS_JARS}/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar  http://archiva.hops.works/repository/Hops/io/hops/hudi/hudi-hadoop-mr-bundle/$HUDI_BUNDLE_VERSION/hudi-hadoop-mr-bundle-$HUDI_BUNDLE_VERSION.jar
-
-RUN mkdir -p $TEZ_JARS && \
-     wget -O ${TEZ_JARS}/apache-tez-${TEZ_VERSION}.tar.gz  https://repo.hops.works/master/apache-tez-${TEZ_VERSION}.tar.gz
-RUN mkdir -p ${TEZ_JARS}/apache-tez-${TEZ_VERSION} \
-     && tar -C $TEZ_JARS/apache-tez-${TEZ_VERSION} -zxf ${TEZ_JARS}/apache-tez-${TEZ_VERSION}.tar.gz \
-     && ln -s ${TEZ_JARS}/apache-tez-${TEZ_VERSION} /srv/hops/apache-tez
-ENV TEZ_JARS=/srv/hops/apache-tez
-
-RUN chmod 755 $TEZ_JARS
 
 ENV METASTORE_XMX=2g
 ENV METASTORE_XMS=2g
