@@ -584,6 +584,12 @@ public class MetastoreConf {
                 "get_partitions_by_filter, \n" +
                 "get_partitions_by_expr.\n" +
             "The default value \"-1\" means no limit."),
+    LOCATION_SCHEME_REWRITE("metastore.location.scheme.rewrite",
+        "hive.metastore.location.scheme.rewrite", "",
+        "Rewrite the scheme of locations returned by the metastore client. " +
+            "Format is \"source_scheme,target_scheme\" (e.g. \"hdfs,rahdfs\"). " +
+            "When set, all table, partition, and database locations with the source scheme " +
+            "will be rewritten to use the target scheme. Leave empty to disable."),
     LOG4J_FILE("metastore.log4j.file", "hive.log4j.file", "",
         "Hive log4j configuration file.\n" +
             "If the property is not set, then logging will be initialized using metastore-log4j2.properties found on the classpath.\n" +
@@ -850,6 +856,8 @@ public class MetastoreConf {
     USERS_IN_ADMIN_ROLE("metastore.users.in.admin.role", "hive.users.in.admin.role", "", false,
         "Comma separated list of users who are in admin role for bootstrapping.\n" +
             "More users can be added in ADMIN role later."),
+    USE_SSL("metastore.use.SSL", "hive.metastore.use.SSL", false,
+      "Set this to true for using SSL encryption in HMS server."),
     USE_THRIFT_SASL("metastore.sasl.enabled", "hive.metastore.sasl.enabled", false,
         "If true, the metastore Thrift interface will be secured with SASL. Clients must authenticate with Kerberos."),
     USE_THRIFT_FRAMED_TRANSPORT("metastore.thrift.framed.transport.enabled",
@@ -883,6 +891,8 @@ public class MetastoreConf {
         "hive.metastore.wm.default.pool.size", 4,
         "The size of a default pool to create when creating an empty resource plan;\n" +
         "If not positive, no default pool will be created."),
+    METASTORE_HOPS_HIVE_TLS("metastore.hops.tls.enabled", "hive.metastore.hops.tls.enabled",
+      true, "Enable Hops TLS authentication"),
 
     // Hive values we have copied and use as is
     // These two are used to indicate that we are running tests
