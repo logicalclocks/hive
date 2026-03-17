@@ -48,11 +48,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.security.auth.login.LoginException;
 
+import com.google.common.base.Strings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.commons.lang.ArrayUtils;
@@ -140,6 +143,9 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
   // for client app certificates
   private Thread clientCertUpdaterThread = null;
 
+  private final Pattern locationSchemePattern;
+  private final String targetRewriteSchemePrefix;
+
   static final protected Logger LOG = LoggerFactory.getLogger(HiveMetaStoreClient.class);
 
   public HiveMetaStoreClient(Configuration conf) throws MetaException {
@@ -165,6 +171,15 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     uriResolverHook = loadUriResolverHook();
     fileMetadataBatchSize = MetastoreConf.getIntVar(
         conf, ConfVars.BATCH_RETRIEVE_OBJECTS_MAX);
+
+    String[] rewriteSchemeConfig = locationSchemeRewrite(conf);
+    if (rewriteSchemeConfig[0] != null) {
+      locationSchemePattern = Pattern.compile("^" + Pattern.quote(rewriteSchemeConfig[0]) + "://");
+      targetRewriteSchemePrefix = rewriteSchemeConfig[1] + "://";
+    } else {
+      locationSchemePattern = null;
+      targetRewriteSchemePrefix = null;
+    }
 
     String msUri = MetastoreConf.getVar(conf, ConfVars.THRIFT_URIS);
     localMetaStore = MetastoreConf.isEmbeddedMetaStore(msUri);
@@ -233,6 +248,22 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     }
     // finally open the store
     open();
+  }
+
+  @VisibleForTesting
+  protected String[] locationSchemeRewrite(Configuration conf) {
+    String rewriteConfig = MetastoreConf.getVar(conf, ConfVars.LOCATION_SCHEME_REWRITE);
+    if (Strings.isNullOrEmpty(rewriteConfig.trim())) {
+      return new String[]{null, null};
+    }
+    String[] parts = rewriteConfig.split(",", 2);
+    if (parts.length != 2) {
+      return new String[]{null, null};
+    }
+    if (Strings.isNullOrEmpty(parts[0].trim()) || Strings.isNullOrEmpty(parts[1].trim())) {
+      return new String[]{null, null};
+    }
+    return new String[]{parts[0].trim(), parts[1].trim()};
   }
 
   private void resolveUris() throws MetaException {
@@ -437,13 +468,20 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
 
   }
 
+
+  private boolean isHopsTlsEnabled() {
+    return MetastoreConf.getBoolVar(conf, ConfVars.METASTORE_HOPS_HIVE_TLS) &&
+      conf.getBoolean(
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
+  }
+
   private void open() throws MetaException {
     isConnected = false;
     TTransportException tte = null;
 
-    boolean hopsTLS = conf.getBoolean(
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
+    boolean hopsTLS = isHopsTlsEnabled();
+    boolean useSSL = MetastoreConf.getBoolVar(conf, ConfVars.USE_SSL);
     boolean useSasl = MetastoreConf.getBoolVar(conf, ConfVars.USE_THRIFT_SASL);
     boolean useFramedTransport = MetastoreConf.getBoolVar(conf, ConfVars.USE_THRIFT_FRAMED_TRANSPORT);
     boolean useCompactProtocol = MetastoreConf.getBoolVar(conf, ConfVars.USE_THRIFT_COMPACT_PROTOCOL);
@@ -459,8 +497,31 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
         try {
           // In HopsHive the meaning of useSSL is different. We require client authentication.
           // Moreover, the information regarding truststore location and password are written
-          // in a different file. We removed the properties from HiveConf to avoid confusion.
-          // Hence, here the upstream branch of the if (useSSL) is missing.
+          // in a different file.
+          if (useSSL) {
+            try {
+              String trustStorePath = MetastoreConf.getVar(conf, ConfVars.SSL_TRUSTSTORE_PATH).trim();
+              if (trustStorePath.isEmpty()) {
+                throw new IllegalArgumentException(ConfVars.SSL_TRUSTSTORE_PATH.toString()
+                  + " Not configured for SSL connection");
+              }
+              String trustStorePassword =
+                MetastoreConf.getPassword(conf, MetastoreConf.ConfVars.SSL_TRUSTSTORE_PASSWORD);
+
+              // Create an SSL socket and connect
+              transport = SecurityUtils.getSSLSocket(store.getHost(), store.getPort(), clientSocketTimeout,
+                trustStorePath, trustStorePassword );
+              LOG.info("Opened an SSL connection to metastore, current connections: " + connCount.incrementAndGet());
+            } catch(IOException e) {
+              throw new IllegalArgumentException(e);
+            } catch(TTransportException e) {
+              tte = e;
+              throw new MetaException(e.toString());
+            }
+          } else {
+            transport = new TSocket(store.getHost(), store.getPort(), clientSocketTimeout);
+          }
+
           if (useSasl) {
             // Wrap thrift connection with SASL for secure connection.
             try {
@@ -2293,6 +2354,9 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     Partition copy = null;
     if (partition != null) {
       copy = new Partition(partition);
+      if (copy.getSd() != null && copy.getSd().getLocation() != null) {
+        copy.getSd().setLocation(rewriteLocationScheme(copy.getSd().getLocation()));
+      }
     }
     return copy;
   }
@@ -2301,6 +2365,9 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     Database copy = null;
     if (database != null) {
       copy = new Database(database);
+      if (copy.getLocationUri() != null) {
+        copy.setLocationUri(rewriteLocationScheme(copy.getLocationUri()));
+      }
     }
     return copy;
   }
@@ -2309,8 +2376,20 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     Table copy = null;
     if (table != null) {
       copy = new Table(table);
+      if (copy.getSd() != null && copy.getSd().getLocation() != null) {
+        copy.getSd().setLocation(rewriteLocationScheme(copy.getSd().getLocation()));
+      }
     }
     return copy;
+  }
+
+  @VisibleForTesting
+  protected String rewriteLocationScheme(String location) {
+    if (locationSchemePattern == null) {
+      return location;
+    }
+    Matcher matcher = locationSchemePattern.matcher(location);
+    return matcher.replaceFirst(targetRewriteSchemePrefix);
   }
 
   private Type deepCopy(Type type) {
