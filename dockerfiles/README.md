@@ -13,7 +13,7 @@ This folder contains the files we copy to the image when building
 
 - User: `hive`
 - HIVE_VERSION: `3.0.0.13.15`. This should come automatically from reading the pom file
-- HADOOP_VERSION_EE: `3.2.0.18-EE-RC2`
+- HADOOP_VERSION_EE: `3.2.0.19-EE-RC0`
 - PROMETHEUS_EXPORTER_VERSION: '0.12.0'
 - MYSQL_CONNECTOR_VERSION: '8.0.21'
 - HUDI_BUNDLE_VERSION: '0.12.3.0'
