@@ -220,6 +220,17 @@
    <repository>
      <id>HopsEE</id>
      <name>Hops EE Repository</name>
+     <url>https://nexus.hops.works/repository/hops-artifacts</url>
+     <releases>
+       <enabled>true</enabled>
+     </releases>
+     <snapshots>
+       <enabled>true</enabled>
+     </snapshots>
+   </repository>
+   <repository>
+     <id>HiveEE</id>
+     <name>Hive EE Repository</name>
      <url>https://nexus.hops.works/repository/hive-artifacts</url>
      <releases>
        <enabled>true</enabled>
