@@ -36,7 +36,7 @@
       <outputDirectory>lib</outputDirectory>
       <unpack>false</unpack>
       <useProjectArtifact>true</useProjectArtifact>
-      <useStrictFiltering>true</useStrictFiltering>
+      <useStrictFiltering>false</useStrictFiltering>
       <useTransitiveFiltering>true</useTransitiveFiltering>
       <excludes>
         <exclude>io.hops:*</exclude>
