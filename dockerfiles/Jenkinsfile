@@ -15,9 +15,15 @@ node("local") {
               export VERSION=\$(cat version.log)
               echo -n \$VERSION > version.log
               echo \$VERSION
+
+              mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=image.build.version | grep -Ev 'Download|INFO|WARNING' > build_version.log
+              export BUILD_VERSION=\$(cat build_version.log)
+              echo -n \$BUILD_VERSION > build_version.log
+              echo \$BUILD_VERSION
         """
-        version = readFile "${env.WORKSPACE}/version.log"
-        withEnv(["HIVE_VERSION=${version.trim()}", ]) {
+        version = readFile("${env.WORKSPACE}/version.log").trim()
+        buildVersion = readFile("${env.WORKSPACE}/build_version.log").trim()
+        withEnv(["HIVE_VERSION=${version.trim()}", "IMAGE_BUILD_VERSION=${buildVersion.trim()}"]) {
           def builder = new ImageBuilder(this)
 
           sh "printf \"user=$USERNAME\npassword=$PASSWORD\" > $WORKSPACE/dockerfiles/wgetrc"
