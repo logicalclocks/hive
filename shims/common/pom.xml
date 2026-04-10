@@ -61,6 +61,11 @@
          </exclusions>
     </dependency>
     <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-hdfs</artifactId>
+      <version>${hadoop.version}</version>
+    </dependency>
+    <dependency>
       <groupId>commons-lang</groupId>
       <artifactId>commons-lang</artifactId>
       <version>${commons-lang.version}</version>
