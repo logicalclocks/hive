@@ -61,7 +61,7 @@
   </modules>
 
   <properties>
-    <hive.version.shortname>3.0.0.10</hive.version.shortname>
+    <hive.version.shortname>3.0.0.13</hive.version.shortname>
     <image.build.version>v1</image.build.version>
 
     <!-- Build Properties -->
