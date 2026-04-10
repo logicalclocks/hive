@@ -853,6 +853,17 @@
      </snapshots>
    </repository>
    <repository>
+     <id>HiveEE</id>
+     <name>Hive EE Repository</name>
+     <url>https://nexus.hops.works/repository/hive-artifacts</url>
+     <releases>
+       <enabled>true</enabled>
+     </releases>
+     <snapshots>
+       <enabled>true</enabled>
+     </snapshots>
+   </repository>
+   <repository>
      <id>hops-repository</id>
      <name>Hops Repository</name>
      <url>https://archiva.hops.works/repository/Hops/</url>
