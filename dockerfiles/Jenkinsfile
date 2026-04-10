@@ -42,8 +42,9 @@ EOF
               -s $WORKSPACE/mvn-settings.xml \
               -Dartifact=io.hops.hive:hive-packaging:\${HIVE_VERSION}:tar.gz:bin \
               -DoutputDirectory=$WORKSPACE/dockerfiles/ \
+              -Dmdep.stripVersion=true \
               -U
-            mv $WORKSPACE/dockerfiles/hive-packaging-*-bin.tar.gz $WORKSPACE/dockerfiles/hive-packaging-\${HIVE_VERSION}-bin.tar.gz
+            mv $WORKSPACE/dockerfiles/hive-packaging-bin.tar.gz $WORKSPACE/dockerfiles/hive-packaging-\${HIVE_VERSION}-bin.tar.gz
             rm $WORKSPACE/mvn-settings.xml
           """
           sh "printf \"user=$USERNAME\npassword=$PASSWORD\" > $WORKSPACE/dockerfiles/wgetrc"
