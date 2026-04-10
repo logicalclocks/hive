@@ -26,6 +26,26 @@ node("local") {
         withEnv(["HIVE_VERSION=${version.trim()}", "IMAGE_BUILD_VERSION=${buildVersion.trim()}"]) {
           def builder = new ImageBuilder(this)
 
+          sh """
+            cat > $WORKSPACE/mvn-settings.xml << EOF
+<settings>
+  <servers>
+    <server>
+      <id>HopsEE</id>
+      <username>$USERNAME</username>
+      <password>$PASSWORD</password>
+    </server>
+  </servers>
+</settings>
+EOF
+            mvn dependency:copy \
+              -s $WORKSPACE/mvn-settings.xml \
+              -Dartifact=io.hops.hive:hive-packaging:\${HIVE_VERSION}:tar.gz:bin \
+              -DoutputDirectory=$WORKSPACE/dockerfiles/ \
+              -U
+            mv $WORKSPACE/dockerfiles/hive-packaging-*-bin.tar.gz $WORKSPACE/dockerfiles/hive-packaging-\${HIVE_VERSION}-bin.tar.gz
+            rm $WORKSPACE/mvn-settings.xml
+          """
           sh "printf \"user=$USERNAME\npassword=$PASSWORD\" > $WORKSPACE/dockerfiles/wgetrc"
           sh "ls $WORKSPACE/dockerfiles"
 

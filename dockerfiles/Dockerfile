@@ -2,7 +2,6 @@
 FROM eclipse-temurin:8
 ARG HIVE_VERSION
 ARG HIVE_TAR_NAME=hive-packaging-${HIVE_VERSION}-bin.tar.gz
-ARG NEXUS_HIVE_URL="https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging"
 ARG HADOOP_VERSION_EE=3.2.0.19-EE-RC0
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
 ARG PROMETHEUS_EXPORTER_VERSION="0.12.0"
@@ -34,13 +33,11 @@ RUN mkdir -p /usr/lib/jvm &&  ln -s $JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
 ENV HADOOP_HOME=/srv/hops/hadoop
 ENV HADOOP_CONF_DIR="$HADOOP_HOME/conf"
 
-# Download hive
-# https://nexus.hops.works/repository/hive-artifacts/io/hops/hive/hive-packaging/${HIVE_VERSION}/hive-packaging-${HIVE_VERSION}-bin.tar.gz
-RUN --mount=type=secret,id=wgetrc,dst=/root/.wgetrc \
-    wget -q ${NEXUS_HIVE_URL}/$HIVE_VERSION/${HIVE_TAR_NAME} && \
-    tar -C /srv/hops/ -zxf ${HIVE_TAR_NAME} && \
+# Copy pre-downloaded hive packaging artifact
+COPY ${HIVE_TAR_NAME} /tmp/${HIVE_TAR_NAME}
+RUN tar -C /srv/hops/ -zxf /tmp/${HIVE_TAR_NAME} && \
     ln -s /srv/hops/apache-hive-$HIVE_VERSION-bin /srv/hops/hive && \
-    rm ${HIVE_TAR_NAME}
+    rm /tmp/${HIVE_TAR_NAME}
 
 RUN rm -rf /srv/hops/hive/conf/*
 RUN chmod -R 755 -R /srv/hops/apache-hive-$HIVE_VERSION-bin
