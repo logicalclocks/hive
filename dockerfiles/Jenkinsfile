@@ -2,10 +2,22 @@
 
 import com.logicalclocks.jenkins.k8s.ImageBuilder
 
+properties([
+    parameters([
+        string(name: 'BRANCH_TO_BUILD', defaultValue: 'master', description: 'Hive branch to build')
+    ])
+])
 
 node("local") {
     stage('Clone repository') {
-      checkout scm
+        checkout([$class: 'GitSCM',
+            branches: [[name: "${params.BRANCH_TO_BUILD}"]],
+            userRemoteConfigs: [[
+                url: 'git@github.com:logicalclocks/hive.git',
+                credentialsId: 'id_rsa'
+            ]],
+            extensions: [[$class: 'CloneOption', shallow: true, depth: 1, noTags: false]]
+        ])
     }
 
     stage('Build and push image(s)') {
