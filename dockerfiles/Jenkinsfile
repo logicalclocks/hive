@@ -10,13 +10,14 @@ properties([
 
 node("local") {
     stage('Clone repository') {
-      sh '''
-        BRANCH=$(echo ${BRANCH_TO_BUILD} | sed 's|origin/||')
-        echo "Cloning Hive branch ${BRANCH}"
-        cd ${WORKSPACE}
-        rm -rf .git * .??* 2>/dev/null || true
-        git clone --depth=1 --branch ${BRANCH} git@github.com:logicalclocks/hive.git .
-      '''
+        checkout([$class: 'GitSCM',
+            branches: [[name: "${params.BRANCH_TO_BUILD}"]],
+            userRemoteConfigs: [[
+                url: 'git@github.com:logicalclocks/hive.git',
+                credentialsId: 'id_rsa'
+            ]],
+            extensions: [[$class: 'CloneOption', shallow: true, depth: 1, noTags: false]]
+        ])
     }
 
     stage('Build and push image(s)') {
