@@ -2,10 +2,21 @@
 
 import com.logicalclocks.jenkins.k8s.ImageBuilder
 
+properties([
+    parameters([
+        string(name: 'BRANCH_TO_BUILD', defaultValue: 'branch-3.0.0.14', description: 'Hive branch to build')
+    ])
+])
 
 node("local") {
     stage('Clone repository') {
-      checkout scm
+      sh '''
+        BRANCH=$(echo ${BRANCH_TO_BUILD} | sed 's|origin/||')
+        echo "Cloning Hive branch ${BRANCH}"
+        cd ${WORKSPACE}
+        rm -rf .git * .??* 2>/dev/null || true
+        git clone --depth=1 --branch ${BRANCH} git@github.com:logicalclocks/hive.git .
+      '''
     }
 
     stage('Build and push image(s)') {
