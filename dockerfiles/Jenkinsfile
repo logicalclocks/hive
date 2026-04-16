@@ -4,7 +4,7 @@ import com.logicalclocks.jenkins.k8s.ImageBuilder
 
 properties([
     parameters([
-        string(name: 'BRANCH_TO_BUILD', defaultValue: 'main', description: 'Hive branch to build')
+        string(name: 'BRANCH_TO_BUILD', defaultValue: 'master', description: 'Hive branch to build')
     ])
 ])
 
