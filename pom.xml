@@ -62,7 +62,7 @@
 
   <properties>
     <hive.version.shortname>3.0.0.14</hive.version.shortname>
-    <image.build.version>v1</image.build.version>
+    <image.build.version>v2</image.build.version>
 
     <!-- Build Properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
