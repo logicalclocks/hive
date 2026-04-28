@@ -7,6 +7,7 @@ The Apache Hive (TM) data warehouse software facilitates reading,
 writing, and managing large datasets residing in distributed storage
 using SQL. Built on top of Apache Hadoop (TM), it provides:
 
+test
 * Tools to enable easy access to data via SQL, thus enabling data
   warehousing tasks such as extract/transform/load (ETL), reporting,
   and data analysis
