@@ -14,6 +14,8 @@ ARG USERID="1516"
 ARG HADOOP_GROUP_NAME="hadoop"
 ARG HADOOP_GROUP_ID="1234"
 
+RUN apt-get update && apt-get upgrade -y
+
 RUN groupadd -g ${HADOOP_GROUP_ID} ${HADOOP_GROUP_NAME} && \
     useradd -m --uid ${USERID} --gid ${HADOOP_GROUP_ID} ${USER}
 
