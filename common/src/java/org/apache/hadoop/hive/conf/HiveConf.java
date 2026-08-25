@@ -5874,7 +5874,33 @@ public class HiveConf extends Configuration {
 
     HIVE_OTEL_RETRY_BACKOFF_MULTIPLIER("hive.otel.retry.backoff.multiplier", 5f,
         "The multiplier applied to the backoff interval for retries in the OTEL exporter."
-            + "This determines how much the backoff interval increases after each failed attempt, following an exponential backoff strategy.");
+            + "This determines how much the backoff interval increases after each failed attempt, following an exponential backoff strategy."),
+
+    /**
+     * Compatibility alias for the pre-HIVE-27925 spelling of {@link #METASTORE_URIS}.
+     * HIVE-27925 renamed the ConfVars constants in Hive 4.0.0 without leaving aliases,
+     * which breaks consumers compiled against Hive 3.x at link time with a
+     * NoSuchFieldError (notably Apache Iceberg's HiveCatalog and CachedClientPool).
+     * Declares the same varname and default as its counterpart, and is excluded from
+     * the generated hive-default.xml.template so it emits no duplicate property block.
+     *
+     * @deprecated Use {@link #METASTORE_URIS}.
+     */
+    @Deprecated
+    METASTOREURIS("hive.metastore.uris", "",
+        "Thrift URI for the remote metastore. Used by metastore client to connect to remote metastore.",
+        true),
+
+    /**
+     * Compatibility alias for the pre-HIVE-27925 spelling of {@link #METASTORE_WAREHOUSE}.
+     * See {@link #METASTOREURIS} for rationale.
+     *
+     * @deprecated Use {@link #METASTORE_WAREHOUSE}.
+     */
+    @Deprecated
+    METASTOREWAREHOUSE("hive.metastore.warehouse.dir", "/user/hive/warehouse",
+        "location of default database for the warehouse",
+        true);
 
     public final String varname;
     public final String altName;
