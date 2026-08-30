@@ -65,7 +65,7 @@ jobs:
           # TestTSSLBasedProcessor, TestHiveConf). Everything else is deliberately out of
           # scope: a port PR touches nearly every module, so selecting purely on the diff
           # would pull in ql and llap-server and run for hours.
-          ALLOWED="common serde service shims/common shims/0.23
+          ALLOWED="common serde service shims/common shims/0.23 hops-jdbc
                    standalone-metastore/metastore-common
                    standalone-metastore/metastore-server"
 

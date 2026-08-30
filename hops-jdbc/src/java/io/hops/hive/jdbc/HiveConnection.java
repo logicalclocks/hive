@@ -64,6 +64,8 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.transport.TSSLTransportFactory;
 import org.apache.thrift.transport.TTransport;
+
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -167,6 +169,17 @@ public class HiveConnection implements java.sql.Connection {
     return ZooKeeperHiveClientHelper.getDirectParamsList(params);
   }
 
+  /**
+   * Builds a connection that is not attached to a server, so that the methods which do not
+   * need one -- close() in particular -- can be exercised in unit tests. Mirrors the
+   * equivalent constructor upstream.
+   */
+  @VisibleForTesting
+  public HiveConnection() {
+    sessConfMap = null;
+    isEmbeddedMode = true;
+  }
+
   public HiveConnection(String uri, Properties info) throws SQLException {
     setupLoginTimeout();
     try {
@@ -247,6 +260,12 @@ public class HiveConnection implements java.sql.Connection {
           LOG.warn("Failed to connect to " + connParams.getHost() + ":" + connParams.getPort());
           String errMsg = null;
           String warnMsg = "Could not open client transport to: " + host + ":" + String.valueOf(port) + " : ";
+          try {
+            close();
+          } catch (Exception ex) {
+            // Swallow the exception
+            LOG.debug("Error while closing the connection", ex);
+          }
           if (ZooKeeperHiveClientHelper.isZkDynamicDiscoveryMode(sessConfMap)) {
             errMsg = "Could not open client transport for any of the Server URI's in ZooKeeper: ";
             // Try next available server in zookeeper, or retry all the servers again if retry is enabled
@@ -277,15 +296,15 @@ public class HiveConnection implements java.sql.Connection {
 
   private void executeInitSql() throws SQLException {
     if (initFile != null) {
-      try {
+      try (Statement st = createStatement()) {
         List<String> sqlList = parseInitFile(initFile);
-        Statement st = createStatement();
         for(String sql : sqlList) {
           boolean hasResult = st.execute(sql);
           if (hasResult) {
-            ResultSet rs = st.getResultSet();
-            while (rs.next()) {
-              System.out.println(rs.getString(1));
+            try (ResultSet rs = st.getResultSet()) {
+              while (rs.next()) {
+                System.out.println(rs.getString(1));
+              }
             }
           }
         }
@@ -912,17 +931,21 @@ public class HiveConnection implements java.sql.Connection {
 
   @Override
   public void close() throws SQLException {
-    if (!isClosed) {
-      TCloseSessionReq closeReq = new TCloseSessionReq(sessHandle);
-      try {
+    // isClosed only tells whether a session was ever opened, so it guards the CloseSession rpc
+    // alone: the transport is bound by openTransport() before that and has to be released even
+    // when openSession() never ran, or a connection that failed to open leaks its socket.
+    try {
+      if (!isClosed) {
+        TCloseSessionReq closeReq = new TCloseSessionReq(sessHandle);
         client.CloseSession(closeReq);
-      } catch (TException e) {
-        throw new SQLException("Error while cleaning up the server resources", e);
-      } finally {
-        isClosed = true;
-        if (transport != null) {
-          transport.close();
-        }
+      }
+    } catch (TException e) {
+      throw new SQLException("Error while cleaning up the server resources", e);
+    } finally {
+      isClosed = true;
+      if (transport != null && transport.isOpen()) {
+        transport.close();
+        transport = null;
       }
     }
   }
