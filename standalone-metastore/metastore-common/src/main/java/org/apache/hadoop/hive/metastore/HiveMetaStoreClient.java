@@ -1115,16 +1115,12 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
         throw new MetaException(e.toString());
       } catch (FileNotFoundException e) {
         HopsSecurityMaterial mat = readClientMaterial();
-        clientCertUpdaterThread = new Thread(new ClientCertUpdater(client, mat));
-        clientCertUpdaterThread.setDaemon(true);
-        clientCertUpdaterThread.start();
+        startClientCertUpdater(mat);
         return mat;
       }
     } else {
       HopsSecurityMaterial mat = readClientMaterial();
-      clientCertUpdaterThread = new Thread(new ClientCertUpdater(client, mat));
-      clientCertUpdaterThread.setDaemon(true);
-      clientCertUpdaterThread.start();
+      startClientCertUpdater(mat);
       return mat;
     }
   }
@@ -1178,6 +1174,22 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     public ByteBuffer getTrustStore() { return trustStore; }
   }
 
+  /**
+   * Starts the certificate reloader for this client. getHopsSecurityMaterial() is called
+   * more than once per client (building the TLS transport, then set_crypto after
+   * connecting), and the thread is tracked in a single field, so any thread started by an
+   * earlier call has to be stopped here -- otherwise it becomes unreachable and close()
+   * can never interrupt it.
+   */
+  private void startClientCertUpdater(HopsSecurityMaterial mat) {
+    if (clientCertUpdaterThread != null) {
+      clientCertUpdaterThread.interrupt();
+    }
+    clientCertUpdaterThread = new Thread(new ClientCertUpdater(client, mat));
+    clientCertUpdaterThread.setDaemon(true);
+    clientCertUpdaterThread.start();
+  }
+
   private class ClientCertUpdater implements Runnable {
     private HopsSecurityMaterial securityMaterial;
 
@@ -1198,6 +1210,12 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
                 securityMaterial.getTrustStore(), securityMaterial.getTrustStorePassword(), true);
             lastLoaded = trustStore.lastModified();
           }
+        } catch (InterruptedException e) {
+          // Thread.sleep clears the interrupt status when it throws, so restore it and
+          // leave the loop: otherwise close()'s interrupt() is swallowed here and the
+          // thread -- along with the client and its HiveConf -- is retained forever.
+          Thread.currentThread().interrupt();
+          return;
         } catch (Exception e) {
           // swallow
         }
