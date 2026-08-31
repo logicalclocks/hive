@@ -31,7 +31,7 @@ pipeline {
 
   parameters {
     booleanParam(name: 'BUILD_IMAGE_ONLY', defaultValue: false, description: 'Only build and push the Docker image using an existing Hive package.')
-    string(name: 'BRANCH_TO_BUILD', defaultValue: 'hops-4.1.0', description: 'Git branch to build.')
+    string(name: 'BRANCH_TO_BUILD', defaultValue: 'branch-4.1', description: 'Git branch to build.')
     string(name: 'MAVEN_CMD', defaultValue: 'mvn', description: 'Maven executable to use.')
     string(name: 'MAVEN_ARGS', defaultValue: 'clean install deploy -Pdist -DskipTests -Denforcer.skip=true', description: 'Maven goals and arguments.')
     string(name: 'MAVEN_DEPLOY_ARGS', defaultValue: 'deploy -Pdist -DskipTests -Denforcer.skip=true', description: 'Maven goals for the second publish to hops-artifacts. Must not include clean or the artifacts built by MAVEN_ARGS are discarded.')
