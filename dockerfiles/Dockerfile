@@ -69,7 +69,7 @@ ENV PATH="/srv/hops/super_crypto/hive:$HIVE_HOME/bin:/opt/venv/bin:$HADOOP_HOME/
 ENV HOPSWORKS_JARS=/srv/hops/hopsworks-jars
 RUN mkdir -p ${HOPSWORKS_JARS}
 # https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-0.12.0.jar
-RUN wget -qO ${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar https://repo.hops.works/master/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar
+RUN wget -qO ${HOPSWORKS_JARS}/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar https://repo.hops.works/master/prometheus/jmx_prometheus_javaagent-${PROMETHEUS_EXPORTER_VERSION}.jar
 # https://repo.hops.works/master/mysql-connector-java-8.0.21-bin.jar
 RUN wget -qO ${HOPSWORKS_JARS}/mysql-connector-j-${MYSQL_CONNECTOR_VERSION}.jar https://repo.hops.works/master/mysql-connector-j-${MYSQL_CONNECTOR_VERSION}.jar
 
