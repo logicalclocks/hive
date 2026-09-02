@@ -933,6 +933,16 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
         if (isConnected) {
           break;
         }
+        // This attempt failed and the next one overwrites the transport field, so whatever it
+        // left behind has to be released here or it is leaked for the life of the process.
+        // set_crypto runs after the socket is established and authenticated, so this is not
+        // hypothetical: a failure there abandons a connection the metastore is still holding a
+        // worker thread for, and the pool is finite.
+        if ((transport != null) && transport.isOpen()) {
+          LOG.warn("Releasing the connection of a failed attempt to metastore with URI ({})",
+              store);
+          closeTransport();
+        }
       }
       // Wait before launching the next round of connection retries.
       if (!isConnected && retryDelaySeconds > 0) {
@@ -1237,6 +1247,18 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     } catch (TException e) {
       LOG.debug("Unable to shutdown metastore client. Will try closing transport directly.", e);
     }
+    closeTransport();
+  }
+
+  /**
+   * Releases the transport and accounts for it. Shared by {@link #close()} and by the failed
+   * attempt path in {@link #open()} so the two cannot drift: a connection abandoned mid-connect
+   * has to be released exactly the way a connection abandoned at shutdown is.
+   *
+   * <p>No-op when there is nothing open, so it is safe to call on an attempt that never got a
+   * socket.
+   */
+  private void closeTransport() {
     if ((transport != null) && transport.isOpen()) {
       transport.close();
       final int newCount = connCount.decrementAndGet();
