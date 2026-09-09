@@ -164,6 +164,12 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
   private boolean isConnected = false;
   private URI metastoreUris[];
   private Thread clientCertUpdaterThread = null;
+  // Set only when the material came from the local MATERIAL_DIRECTORY files, which is the
+  // only source whose truststore mtime means anything. open() starts the reloader once the
+  // client exists: getMaterialForUser() is reached twice per connect, the first time while
+  // createBinaryClient() is still building the TLS transport, so starting it there gave every
+  // client a thread whose only possible action was to NPE on a null client field.
+  private HopsSecurityMaterial reloadableMaterial = null;
   private Pattern locationSchemePattern;
   private String targetRewriteSchemePrefix;
   private final HiveMetaHookLoader hookLoader;
@@ -831,6 +837,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
 
   private void open() throws MetaException {
     isConnected = false;
+    // A reconnect may resolve its material from a different source than the previous connect did
+    reloadableMaterial = null;
     TTransportException tte = null;
     MetaException recentME = null;
     boolean useSSL = MetastoreConf.getBoolVar(conf, ConfVars.USE_SSL);
@@ -922,6 +930,9 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
               String username = UserGroupInformation.getCurrentUser().getUserName();
               if (!username.equals(MetastoreConf.getVar(conf, ConfVars.HIVE_SUPER_USER))) {
                 HopsSecurityMaterial mat = getHopsSecurityMaterial();
+                if (reloadableMaterial != null) {
+                  startClientCertUpdater(reloadableMaterial);
+                }
                 client.set_crypto(mat.getKeyStore(), mat.getKeyStorePassword(),
                     mat.getTrustStore(), mat.getTrustStorePassword(), false);
               }
@@ -1120,12 +1131,12 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
         throw new MetaException(e.toString());
       } catch (FileNotFoundException e) {
         HopsSecurityMaterial mat = readClientMaterial();
-        startClientCertUpdater(mat);
+        reloadableMaterial = mat;
         return mat;
       }
     } else {
       HopsSecurityMaterial mat = readClientMaterial();
-      startClientCertUpdater(mat);
+      reloadableMaterial = mat;
       return mat;
     }
   }
@@ -1210,8 +1221,15 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
           Thread.sleep(MetastoreConf.getLongVar(conf, MetastoreConf.ConfVars.CERT_RELOAD_THREAD_SLEEP));
           File trustStore = new File(securityMaterial.getTrustStorePath());
           if (trustStore.lastModified() != lastLoaded) {
+            // Read the field once: it is volatile and open() can replace it, so re-reading it
+            // between a null check and the call would reintroduce the NPE this guards.
+            ThriftHiveMetastore.Iface target = client;
+            if (target == null) {
+              // Not connected yet. Skip without advancing lastLoaded so the next tick retries.
+              continue;
+            }
             securityMaterial = readClientMaterial();
-            client.set_crypto(securityMaterial.getKeyStore(), securityMaterial.getKeyStorePassword(),
+            target.set_crypto(securityMaterial.getKeyStore(), securityMaterial.getKeyStorePassword(),
                 securityMaterial.getTrustStore(), securityMaterial.getTrustStorePassword(), true);
             lastLoaded = trustStore.lastModified();
           }

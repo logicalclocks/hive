@@ -39,6 +39,12 @@ import org.mockito.Mockito;
  * each is asserted separately: the run loop swallowed the InterruptedException that close()
  * raises, and getHopsSecurityMaterial() is reached twice per connect, which used to overwrite
  * the single thread field and leave the first thread unreachable.
+ *
+ * <p>open() now starts the reloader once, after the client field is assigned, so nothing in
+ * production reaches startClientCertUpdater() twice on one client any more.
+ * startingASecondReloaderStopsTheFirst therefore guards a defensive property rather than a
+ * sequence the connect path still produces -- worth keeping, since the helper is what a future
+ * second call site would rely on, but it is no longer evidence about the connect path.
  */
 public class TestClientCertUpdaterLifecycle {
 
