@@ -155,7 +155,11 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
   // HiveMetaStore.newHMSHandler("hive client", this.conf, true);
   private static final String HIVE_METASTORE_CREATE_HANDLER_METHOD = "newHMSHandler";
 
-  ThriftHiveMetastore.Iface client = null;
+  // volatile: open() publishes a new client on the connecting thread and ClientCertUpdater
+  // reads it on its own thread. Without it the reloader can act on a stale wrapper, whose
+  // monitor is a different one, and the serialisation newSynchronizedThriftClient() provides
+  // would not exclude anything.
+  volatile ThriftHiveMetastore.Iface client = null;
   private TTransport transport = null;
   private boolean isConnected = false;
   private URI metastoreUris[];
@@ -863,7 +867,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
           } else {
             protocol = new TBinaryProtocol(transport);
           }
-          client = new ThriftHiveMetastore.Client(protocol);
+          // Wrap the client with a thread-safe proxy to serialize the RPC calls
+          client = newSynchronizedThriftClient(new ThriftHiveMetastore.Client(protocol));
           try {
             if (!transport.isOpen()) {
               transport.open();
@@ -4871,6 +4876,54 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
       HiveMetaStoreClient.class.getClassLoader(),
       new Class[]{IMetaStoreClient.class},
       new SynchronizedHandler(client));
+  }
+
+  /**
+   * Creates a synchronized wrapper for a {@link ThriftHiveMetastore.Iface}.
+   *
+   * <p>A generated Thrift client holds one socket and one {@code seqid_}: {@code sendBase}
+   * increments the counter and writes, {@code receiveBase} matches the reply against it. Two
+   * threads calling one client therefore corrupt each other's reply stream, surfacing as
+   * {@code TApplicationException: ... out of sequence response} on a message boundary or as an
+   * unparseable body inside it.
+   *
+   * <p>{@link #newSynchronizedClient(IMetaStoreClient)} above serialises callers of the
+   * {@link IMetaStoreClient} API, but it is installed by {@code Hive.getMSC()} and is not
+   * reachable from here, and {@link ClientCertUpdater} holds the {@link #client} field directly
+   * and so bypasses it. Wrapping at the point of construction is what covers both, and it also
+   * covers a directly constructed client, which gets no {@code IMetaStoreClient} wrapper at all.
+   *
+   * <p>Uncontended in the steady state: callers of the outer API are already mutually exclusive,
+   * so the only second party is the certificate reloader. A {@code close()} concurrent with a
+   * reload now waits for that one call to finish instead of interleaving with it.
+   *
+   * @param client unsynchronized client
+   * @return synchronized client
+   */
+  private static ThriftHiveMetastore.Iface newSynchronizedThriftClient(
+      ThriftHiveMetastore.Iface client) {
+    return (ThriftHiveMetastore.Iface) Proxy.newProxyInstance(
+      HiveMetaStoreClient.class.getClassLoader(),
+      new Class[]{ThriftHiveMetastore.Iface.class},
+      new SynchronizedThriftHandler(client));
+  }
+
+  private static class SynchronizedThriftHandler implements InvocationHandler {
+    private final ThriftHiveMetastore.Iface client;
+
+    SynchronizedThriftHandler(ThriftHiveMetastore.Iface client) {
+      this.client = client;
+    }
+
+    @Override
+    public synchronized Object invoke(Object proxy, Method method, Object[] args)
+        throws Throwable {
+      try {
+        return method.invoke(client, args);
+      } catch (InvocationTargetException e) {
+        throw e.getTargetException();
+      }
+    }
   }
 
   private static class SynchronizedHandler implements InvocationHandler {
