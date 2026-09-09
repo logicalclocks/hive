@@ -1222,7 +1222,13 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
           Thread.currentThread().interrupt();
           return;
         } catch (Exception e) {
-          // swallow
+          // Non-fatal on purpose: the next tick retries, and a failed refresh must not take the
+          // reloader down with it. It must not be silent either. lastLoaded is only advanced
+          // after a successful push, so a persistent failure re-fires every tick and left no
+          // trace at all, which is why a client running on material the metastore never received
+          // was indistinguishable from one with nothing to refresh.
+          LOG.warn("Failed to refresh the metastore client's certificate material, retrying in {}"
+              + " ms", MetastoreConf.getLongVar(conf, MetastoreConf.ConfVars.CERT_RELOAD_THREAD_SLEEP), e);
         }
       }
     }
