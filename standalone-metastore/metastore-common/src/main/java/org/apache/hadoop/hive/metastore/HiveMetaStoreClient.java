@@ -155,11 +155,21 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
   // HiveMetaStore.newHMSHandler("hive client", this.conf, true);
   private static final String HIVE_METASTORE_CREATE_HANDLER_METHOD = "newHMSHandler";
 
-  ThriftHiveMetastore.Iface client = null;
+  // volatile: open() publishes a new client on the connecting thread and ClientCertUpdater
+  // reads it on its own thread. Without it the reloader can act on a stale wrapper, whose
+  // monitor is a different one, and the serialisation newSynchronizedThriftClient() provides
+  // would not exclude anything.
+  volatile ThriftHiveMetastore.Iface client = null;
   private TTransport transport = null;
   private boolean isConnected = false;
   private URI metastoreUris[];
   private Thread clientCertUpdaterThread = null;
+  // Set only when the material came from the local MATERIAL_DIRECTORY files, which is the
+  // only source whose truststore mtime means anything. open() starts the reloader once the
+  // client exists: getMaterialForUser() is reached twice per connect, the first time while
+  // createBinaryClient() is still building the TLS transport, so starting it there gave every
+  // client a thread whose only possible action was to NPE on a null client field.
+  private HopsSecurityMaterial reloadableMaterial = null;
   private Pattern locationSchemePattern;
   private String targetRewriteSchemePrefix;
   private final HiveMetaHookLoader hookLoader;
@@ -827,6 +837,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
 
   private void open() throws MetaException {
     isConnected = false;
+    // A reconnect may resolve its material from a different source than the previous connect did
+    reloadableMaterial = null;
     TTransportException tte = null;
     MetaException recentME = null;
     boolean useSSL = MetastoreConf.getBoolVar(conf, ConfVars.USE_SSL);
@@ -863,7 +875,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
           } else {
             protocol = new TBinaryProtocol(transport);
           }
-          client = new ThriftHiveMetastore.Client(protocol);
+          // Wrap the client with a thread-safe proxy to serialize the RPC calls
+          client = newSynchronizedThriftClient(new ThriftHiveMetastore.Client(protocol));
           try {
             if (!transport.isOpen()) {
               transport.open();
@@ -917,6 +930,9 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
               String username = UserGroupInformation.getCurrentUser().getUserName();
               if (!username.equals(MetastoreConf.getVar(conf, ConfVars.HIVE_SUPER_USER))) {
                 HopsSecurityMaterial mat = getHopsSecurityMaterial();
+                if (reloadableMaterial != null) {
+                  startClientCertUpdater(reloadableMaterial);
+                }
                 client.set_crypto(mat.getKeyStore(), mat.getKeyStorePassword(),
                     mat.getTrustStore(), mat.getTrustStorePassword(), false);
               }
@@ -1115,12 +1131,12 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
         throw new MetaException(e.toString());
       } catch (FileNotFoundException e) {
         HopsSecurityMaterial mat = readClientMaterial();
-        startClientCertUpdater(mat);
+        reloadableMaterial = mat;
         return mat;
       }
     } else {
       HopsSecurityMaterial mat = readClientMaterial();
-      startClientCertUpdater(mat);
+      reloadableMaterial = mat;
       return mat;
     }
   }
@@ -1205,8 +1221,15 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
           Thread.sleep(MetastoreConf.getLongVar(conf, MetastoreConf.ConfVars.CERT_RELOAD_THREAD_SLEEP));
           File trustStore = new File(securityMaterial.getTrustStorePath());
           if (trustStore.lastModified() != lastLoaded) {
+            // Read the field once: it is volatile and open() can replace it, so re-reading it
+            // between a null check and the call would reintroduce the NPE this guards.
+            ThriftHiveMetastore.Iface target = client;
+            if (target == null) {
+              // Not connected yet. Skip without advancing lastLoaded so the next tick retries.
+              continue;
+            }
             securityMaterial = readClientMaterial();
-            client.set_crypto(securityMaterial.getKeyStore(), securityMaterial.getKeyStorePassword(),
+            target.set_crypto(securityMaterial.getKeyStore(), securityMaterial.getKeyStorePassword(),
                 securityMaterial.getTrustStore(), securityMaterial.getTrustStorePassword(), true);
             lastLoaded = trustStore.lastModified();
           }
@@ -1217,7 +1240,13 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
           Thread.currentThread().interrupt();
           return;
         } catch (Exception e) {
-          // swallow
+          // Non-fatal on purpose: the next tick retries, and a failed refresh must not take the
+          // reloader down with it. It must not be silent either. lastLoaded is only advanced
+          // after a successful push, so a persistent failure re-fires every tick and left no
+          // trace at all, which is why a client running on material the metastore never received
+          // was indistinguishable from one with nothing to refresh.
+          LOG.warn("Failed to refresh the metastore client's certificate material, retrying in {}"
+              + " ms", MetastoreConf.getLongVar(conf, MetastoreConf.ConfVars.CERT_RELOAD_THREAD_SLEEP), e);
         }
       }
     }
@@ -4871,6 +4900,54 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
       HiveMetaStoreClient.class.getClassLoader(),
       new Class[]{IMetaStoreClient.class},
       new SynchronizedHandler(client));
+  }
+
+  /**
+   * Creates a synchronized wrapper for a {@link ThriftHiveMetastore.Iface}.
+   *
+   * <p>A generated Thrift client holds one socket and one {@code seqid_}: {@code sendBase}
+   * increments the counter and writes, {@code receiveBase} matches the reply against it. Two
+   * threads calling one client therefore corrupt each other's reply stream, surfacing as
+   * {@code TApplicationException: ... out of sequence response} on a message boundary or as an
+   * unparseable body inside it.
+   *
+   * <p>{@link #newSynchronizedClient(IMetaStoreClient)} above serialises callers of the
+   * {@link IMetaStoreClient} API, but it is installed by {@code Hive.getMSC()} and is not
+   * reachable from here, and {@link ClientCertUpdater} holds the {@link #client} field directly
+   * and so bypasses it. Wrapping at the point of construction is what covers both, and it also
+   * covers a directly constructed client, which gets no {@code IMetaStoreClient} wrapper at all.
+   *
+   * <p>Uncontended in the steady state: callers of the outer API are already mutually exclusive,
+   * so the only second party is the certificate reloader. A {@code close()} concurrent with a
+   * reload now waits for that one call to finish instead of interleaving with it.
+   *
+   * @param client unsynchronized client
+   * @return synchronized client
+   */
+  private static ThriftHiveMetastore.Iface newSynchronizedThriftClient(
+      ThriftHiveMetastore.Iface client) {
+    return (ThriftHiveMetastore.Iface) Proxy.newProxyInstance(
+      HiveMetaStoreClient.class.getClassLoader(),
+      new Class[]{ThriftHiveMetastore.Iface.class},
+      new SynchronizedThriftHandler(client));
+  }
+
+  private static class SynchronizedThriftHandler implements InvocationHandler {
+    private final ThriftHiveMetastore.Iface client;
+
+    SynchronizedThriftHandler(ThriftHiveMetastore.Iface client) {
+      this.client = client;
+    }
+
+    @Override
+    public synchronized Object invoke(Object proxy, Method method, Object[] args)
+        throws Throwable {
+      try {
+        return method.invoke(client, args);
+      } catch (InvocationTargetException e) {
+        throw e.getTargetException();
+      }
+    }
   }
 
   private static class SynchronizedHandler implements InvocationHandler {

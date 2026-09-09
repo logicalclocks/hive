@@ -39,6 +39,12 @@ import org.mockito.Mockito;
  * each is asserted separately: the run loop swallowed the InterruptedException that close()
  * raises, and getHopsSecurityMaterial() is reached twice per connect, which used to overwrite
  * the single thread field and leave the first thread unreachable.
+ *
+ * <p>open() now starts the reloader once, after the client field is assigned, so nothing in
+ * production reaches startClientCertUpdater() twice on one client any more.
+ * startingASecondReloaderStopsTheFirst therefore guards a defensive property rather than a
+ * sequence the connect path still produces -- worth keeping, since the helper is what a future
+ * second call site would rely on, but it is no longer evidence about the connect path.
  */
 public class TestClientCertUpdaterLifecycle {
 
@@ -64,6 +70,12 @@ public class TestClientCertUpdaterLifecycle {
     Field f = HiveMetaStoreClient.class.getDeclaredField(name);
     f.setAccessible(true);
     f.set(target, value);
+  }
+
+  private static Configuration confOf(HiveMetaStoreClient client) throws Exception {
+    Field f = HiveMetaStoreClient.class.getDeclaredField("conf");
+    f.setAccessible(true);
+    return (Configuration) f.get(client);
   }
 
   private static Thread updaterThread(HiveMetaStoreClient client) throws Exception {
@@ -148,5 +160,32 @@ public class TestClientCertUpdaterLifecycle {
 
     assertTrue("first reloader still running after close()", died(first));
     assertTrue("second reloader still running after close()", died(second));
+  }
+
+  /**
+   * A refresh is allowed to fail -- the next tick retries -- so a failing tick must not take the
+   * thread with it. The failure is no longer silent, but the WARN itself is not asserted here:
+   * metastore-common's test classpath carries only slf4j-simple, so there is no appender to
+   * capture with, and metastore-server's CapturingLogAppender needs log4j2 core.
+   *
+   * <p>Null material is what makes every tick throw, since getTrustStorePath() on it is the
+   * first thing the loop does after waking. A tick every 20ms means an escaping exception kills
+   * the thread inside the first 20ms, so the join below is decided by behaviour, not by timing.
+   */
+  @Test
+  public void aFailingRefreshDoesNotKillTheReloader() throws Exception {
+    HiveMetaStoreClient client = newUnconnectedClient();
+    MetastoreConf.setLongVar(confOf(client), ConfVars.CERT_RELOAD_THREAD_SLEEP, 20L);
+    startUpdater(client);
+    Thread updater = updaterThread(client);
+    assertNotNull(updater);
+
+    updater.join(500);
+
+    assertTrue("a failing refresh must not stop the reloader", updater.isAlive());
+
+    // and the client must still be able to shut it down from that state
+    client.close();
+    assertTrue("close() must stop a reloader whose refresh keeps failing", died(updater));
   }
 }
