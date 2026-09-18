@@ -15,7 +15,7 @@
 
 # syntax=docker/dockerfile:experimental
 FROM eclipse-temurin:17
-ARG HIVE_VERSION=4.1.0
+ARG HIVE_VERSION=4.1.0.0
 ARG HIVE_TAR_NAME=hive-packaging-${HIVE_VERSION}-bin.tar.gz
 ARG HADOOP_VERSION_EE=3.4.3.3-EE-RC0
 ARG PROMETHEUS_EXPORTER_VERSION="1.6.0"

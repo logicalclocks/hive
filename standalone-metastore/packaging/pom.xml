@@ -4,7 +4,7 @@
   <parent>
     <groupId>io.hops.hive</groupId>
     <artifactId>hive-standalone-metastore</artifactId>
-    <version>4.1.0</version>
+    <version>4.1.0.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <artifactId>hive-metastore-packaging</artifactId>
