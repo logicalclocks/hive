@@ -13,6 +13,7 @@ This folder contains the files we copy to the image when building
 
 - User: `hive`
 - HIVE_VERSION: `3.0.0.14.7`. This should come automatically from reading the pom file
+- IMAGE_BUILD_VERSION: `v2`. Comes from `image.build.version` in the root pom; bump it to rebuild the image (e.g. for OS package CVEs) without a new Hive release. Image tag is `<HIVE_VERSION>-<IMAGE_BUILD_VERSION>`
 - HADOOP_VERSION_EE: `3.4.3.1-EE-RC5`
 - PROMETHEUS_EXPORTER_VERSION: '0.12.0'
 - MYSQL_CONNECTOR_VERSION: '8.0.21'
