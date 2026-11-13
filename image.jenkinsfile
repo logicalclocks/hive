@@ -1,0 +1,148 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Image half of the Hive build: builds and pushes the Hive image from the binary tarball
+ * that the Maven job (mvn.jenkinsfile) published to Nexus. It runs no Maven and shares no
+ * files with the Maven job, so the two need not run on the same agent.
+ *
+ * The image needs the Hudi bundle, and Hudi is built against the Hive artifacts the Maven
+ * job publishes, so the order is: mvn.jenkinsfile, then the Hudi build, then this job.
+ */
+@Library("jenkins-library@main")
+
+import com.logicalclocks.jenkins.k8s.ImageBuilder
+
+pipeline {
+  agent { label 'local' }
+
+  options {
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  parameters {
+    string(name: 'BRANCH_TO_BUILD', defaultValue: 'branch-4.1', description: 'Git branch to build. Must be the branch the Maven job built, so the pom version matches the Hive package.')
+  }
+
+  environment {
+    // Where the Maven job deploys: distributionManagement in the root pom.
+    HIVE_ARTIFACTS_URL = 'https://nexus.hops.works/repository/hive-artifacts'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        deleteDir()
+        // Repo URL and credentials come from the job's SCM configuration; only the
+        // branch is overridden by the BRANCH_TO_BUILD parameter.
+        checkout([$class: 'GitSCM',
+          branches: [[name: "${params.BRANCH_TO_BUILD}"]],
+          userRemoteConfigs: scm.userRemoteConfigs
+        ])
+      }
+    }
+
+    stage('Resolve Version') {
+      steps {
+        sh '''#!/bin/bash -eu
+          perl -0ne 'if (m{<artifactId>hive</artifactId>\\s*<version>([^<]+)</version>}) { print "$1"; exit }' pom.xml > version.log
+          echo "POM_VERSION=$(cat version.log)"
+        '''
+      }
+    }
+
+    stage('Build and Push Images') {
+      steps {
+        script {
+          def version = readFile("${env.WORKSPACE}/version.log").trim()
+          def imageBuildVersion = readFile("${env.WORKSPACE}/dockerfiles/image-build-version.properties")
+              .readLines()
+              .find { line -> line.trim() && !line.trim().startsWith('#') && line.contains('IMAGE_BUILD_VERSION=') }
+              ?.split('=', 2)[1]
+              ?.trim()
+
+          if (!imageBuildVersion) {
+            error('IMAGE_BUILD_VERSION is missing from dockerfiles/image-build-version.properties')
+          }
+
+          withCredentials([usernamePassword(credentialsId: 'a0770738-4ef3-4acc-a6ba-097ee6c85b44', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
+            withEnv(["HIVE_VERSION=${version}", "IMAGE_BUILD_VERSION=${imageBuildVersion}"]) {
+              def builder = new ImageBuilder(this)
+
+              sh '''#!/bin/bash -eu
+                # A snapshot is stored in Nexus under a timestamped file name, which a fixed
+                # URL cannot address. Hive versions here are releases (4.1.0.1), so fail
+                # clearly rather than report a misleading 404.
+                case "$HIVE_VERSION" in
+                  *-SNAPSHOT)
+                    echo "HIVE_VERSION=$HIVE_VERSION is a snapshot; this job can only fetch release versions from Nexus." >&2
+                    exit 1
+                    ;;
+                esac
+
+                HIVE_TAR="hive-packaging-${HIVE_VERSION}-bin.tar.gz"
+                HIVE_TAR_URL="${HIVE_ARTIFACTS_URL}/io/hops/hive/hive-packaging/${HIVE_VERSION}/${HIVE_TAR}"
+
+                # Credentials go to curl on stdin (-K -) so they do not show up in the
+                # process list.
+                fetch() {
+                  printf 'user = "%s:%s"\n' "$USERNAME" "$PASSWORD" \
+                    | curl -K - --fail --silent --show-error --location --retry 3 -o "$2" "$1"
+                }
+
+                echo "Fetching $HIVE_TAR_URL"
+                if ! fetch "$HIVE_TAR_URL" "$WORKSPACE/dockerfiles/$HIVE_TAR"; then
+                  echo "Could not fetch the Hive package. Run the Hive Maven job for this branch first." >&2
+                  exit 1
+                fi
+
+                # Nexus publishes a .sha1 next to every artifact; check the download against it.
+                fetch "$HIVE_TAR_URL.sha1" "$WORKSPACE/hive-package.sha1"
+                EXPECTED_SHA1="$(tr -d '[:space:]' < "$WORKSPACE/hive-package.sha1")"
+                ACTUAL_SHA1="$(sha1sum "$WORKSPACE/dockerfiles/$HIVE_TAR" | cut -d' ' -f1)"
+                if [ "$EXPECTED_SHA1" != "$ACTUAL_SHA1" ]; then
+                  echo "Checksum mismatch for $HIVE_TAR: Nexus says $EXPECTED_SHA1, downloaded file is $ACTUAL_SHA1" >&2
+                  exit 1
+                fi
+                echo "SHA-1 $ACTUAL_SHA1 verified"
+
+                printf "user=%s\npassword=%s" "$USERNAME" "$PASSWORD" > "$WORKSPACE/dockerfiles/wgetrc"
+                ls -l "$WORKSPACE/dockerfiles"
+              '''
+
+              def manifest = readFile("${env.WORKSPACE}/dockerfiles/build-manifest.json")
+              builder.run(manifest)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      // wgetrc holds the Nexus credentials; do not leave it in the workspace.
+      sh '''#!/bin/bash
+        rm -f "$WORKSPACE/dockerfiles/wgetrc"
+      '''
+      archiveArtifacts artifacts: 'version.log', allowEmptyArchive: true
+    }
+  }
+}
