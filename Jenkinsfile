@@ -30,7 +30,7 @@ pipeline {
   }
 
   parameters {
-    booleanParam(name: 'BUILD_IMAGE_ONLY', defaultValue: false, description: 'Only build and push the Docker image using an existing Hive package.')
+    booleanParam(name: 'BUILD_IMAGE', defaultValue: false, description: 'false: build the Maven project, deploy the artifacts and copy the Hive package; no image is built. true: only build and push the Docker image from the existing Hive package; no Maven build.')
     string(name: 'BRANCH_TO_BUILD', defaultValue: 'branch-4.1', description: 'Git branch to build.')
     string(name: 'MAVEN_CMD', defaultValue: 'mvn', description: 'Maven executable to use.')
     string(name: 'MAVEN_ARGS', defaultValue: 'clean install deploy -Pdist -DskipTests -Denforcer.skip=true', description: 'Maven goals and arguments.')
@@ -71,7 +71,7 @@ pipeline {
 
     stage('Prepare Maven') {
       when {
-        expression { !params.BUILD_IMAGE_ONLY }
+        expression { !params.BUILD_IMAGE }
       }
       steps {
         withCredentials([usernamePassword(credentialsId: 'a0770738-4ef3-4acc-a6ba-097ee6c85b44', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
@@ -165,7 +165,7 @@ EOF
 
     stage('Build and Deploy') {
       when {
-        expression { !params.BUILD_IMAGE_ONLY }
+        expression { !params.BUILD_IMAGE }
       }
       steps {
         sh '''#!/bin/bash -eu
@@ -233,7 +233,7 @@ EOF
 
     stage('Copy Hive Package') {
       when {
-        expression { !params.BUILD_IMAGE_ONLY }
+        expression { !params.BUILD_IMAGE }
       }
       steps {
         sh '''#!/bin/bash -eu
@@ -273,6 +273,9 @@ EOF
     }
 
     stage('Build and Push Images') {
+      when {
+        expression { params.BUILD_IMAGE }
+      }
       steps {
         script {
           def version = readFile("${env.WORKSPACE}/version.log").trim()
