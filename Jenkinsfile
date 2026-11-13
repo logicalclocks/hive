@@ -289,8 +289,16 @@ EOF
             error('IMAGE_BUILD_VERSION is missing from dockerfiles/image-build-version.properties')
           }
 
+          // Harbor keeps a tag mutable only when it ends in -SNAPSHOT, so the image build
+          // counter goes before that suffix: 4.1.0.3.0-SNAPSHOT + v1 -> 4.1.0.3.0-v1-SNAPSHOT.
+          // A release version is tagged as before: 4.1.0.3 + v1 -> 4.1.0.3-v1.
+          def imageTag = version.endsWith('-SNAPSHOT')
+              ? "${version.replaceFirst(/-SNAPSHOT$/, '')}-${imageBuildVersion}-SNAPSHOT"
+              : "${version}-${imageBuildVersion}"
+          echo "Image tag: ${imageTag}"
+
           withCredentials([usernamePassword(credentialsId: 'a0770738-4ef3-4acc-a6ba-097ee6c85b44', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
-            withEnv(["HIVE_VERSION=${version}", "IMAGE_BUILD_VERSION=${imageBuildVersion}"]) {
+            withEnv(["HIVE_VERSION=${version}", "IMAGE_BUILD_VERSION=${imageBuildVersion}", "IMAGE_TAG=${imageTag}"]) {
               def builder = new ImageBuilder(this)
 
               sh '''#!/bin/bash -eu

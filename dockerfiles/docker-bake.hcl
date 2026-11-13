@@ -49,7 +49,7 @@ target "hive" {
         HIVE_VERSION = "${HIVE_VERSION}",
     }
     tags = [
-        "${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:${HIVE_VERSION}-${IMAGE_BUILD_VERSION}",
+        "${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:${trimsuffix(HIVE_VERSION, "-SNAPSHOT")}-${IMAGE_BUILD_VERSION}${HIVE_VERSION != trimsuffix(HIVE_VERSION, "-SNAPSHOT") ? "-SNAPSHOT" : ""}",
         "${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:${HIVE_VERSION}-${IMAGE_BUILD_VERSION}-${COMMIT_HASH}",
         "${REGISTRY}/${REGISTRY_PROJECT}/hopsworks/hive:${HIVE_VERSION}-${IMAGE_BUILD_VERSION}-${JIRA_TAG}",
     ]
