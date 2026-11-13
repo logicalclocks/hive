@@ -15,14 +15,10 @@
  * limitations under the License.
  */
 
-/*
- * Maven half of the Hive build: builds the project, publishes the artifacts to Nexus and
- * copies the binary tarball to HIVE_PACKAGE_DIR. It does not build the image.
- *
- * The image needs the Hudi bundle, and Hudi is built against the Hive artifacts published
- * here, so the order is: this job, then the Hudi build, then image.jenkinsfile. The image
- * job takes the tarball from Nexus; HIVE_PACKAGE_DIR is kept for other consumers.
- */
+@Library("jenkins-library@main")
+
+import com.logicalclocks.jenkins.k8s.ImageBuilder
+
 pipeline {
   agent { label 'local' }
 
@@ -34,6 +30,7 @@ pipeline {
   }
 
   parameters {
+    booleanParam(name: 'BUILD_IMAGE', defaultValue: false, description: 'false: build the Maven project, deploy the artifacts and copy the Hive package; no image is built. true: only build and push the Docker image from the existing Hive package; no Maven build.')
     string(name: 'BRANCH_TO_BUILD', defaultValue: 'branch-4.1', description: 'Git branch to build.')
     string(name: 'MAVEN_CMD', defaultValue: 'mvn', description: 'Maven executable to use.')
     string(name: 'MAVEN_ARGS', defaultValue: 'clean install deploy -Pdist -DskipTests -Denforcer.skip=true', description: 'Maven goals and arguments.')
@@ -73,6 +70,9 @@ pipeline {
     }
 
     stage('Prepare Maven') {
+      when {
+        expression { !params.BUILD_IMAGE }
+      }
       steps {
         withCredentials([usernamePassword(credentialsId: 'a0770738-4ef3-4acc-a6ba-097ee6c85b44', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
           sh '''#!/bin/bash -eu
@@ -164,6 +164,9 @@ EOF
     }
 
     stage('Build and Deploy') {
+      when {
+        expression { !params.BUILD_IMAGE }
+      }
       steps {
         sh '''#!/bin/bash -eu
           UPDATE_ARG=""
@@ -229,6 +232,9 @@ EOF
     }
 
     stage('Copy Hive Package') {
+      when {
+        expression { !params.BUILD_IMAGE }
+      }
       steps {
         sh '''#!/bin/bash -eu
           HIVE_VERSION="$(tr -d '\\r\\n' < version.log)"
@@ -263,6 +269,42 @@ EOF
 
           ls -l "$HIVE_PACKAGE_DIR/hive-packaging-${HIVE_VERSION}-bin.tar.gz"
         '''
+      }
+    }
+
+    stage('Build and Push Images') {
+      when {
+        expression { params.BUILD_IMAGE }
+      }
+      steps {
+        script {
+          def version = readFile("${env.WORKSPACE}/version.log").trim()
+          def imageBuildVersion = readFile("${env.WORKSPACE}/dockerfiles/image-build-version.properties")
+              .readLines()
+              .find { line -> line.trim() && !line.trim().startsWith('#') && line.contains('IMAGE_BUILD_VERSION=') }
+              ?.split('=', 2)[1]
+              ?.trim()
+
+          if (!imageBuildVersion) {
+            error('IMAGE_BUILD_VERSION is missing from dockerfiles/image-build-version.properties')
+          }
+
+          withCredentials([usernamePassword(credentialsId: 'a0770738-4ef3-4acc-a6ba-097ee6c85b44', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
+            withEnv(["HIVE_VERSION=${version}", "IMAGE_BUILD_VERSION=${imageBuildVersion}"]) {
+              def builder = new ImageBuilder(this)
+
+              sh '''#!/bin/bash -eu
+                test -f "$HIVE_PACKAGE_DIR/hive-packaging-${HIVE_VERSION}-bin.tar.gz"
+                cp "$HIVE_PACKAGE_DIR/hive-packaging-${HIVE_VERSION}-bin.tar.gz" "$WORKSPACE/dockerfiles/hive-packaging-${HIVE_VERSION}-bin.tar.gz"
+                printf "user=%s\npassword=%s" "$USERNAME" "$PASSWORD" > "$WORKSPACE/dockerfiles/wgetrc"
+                ls -l "$WORKSPACE/dockerfiles"
+              '''
+
+              def manifest = readFile("${env.WORKSPACE}/dockerfiles/build-manifest.json")
+              builder.run(manifest)
+            }
+          }
+        }
       }
     }
   }
