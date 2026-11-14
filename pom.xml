@@ -2227,5 +2227,9 @@
       <id>Hive</id>
       <url>https://nexus.hops.works/repository/hive-artifacts</url>
     </repository>
+    <snapshotRepository>
+      <id>Hive</id>
+      <url>https://nexus.hops.works/repository/hive-artifacts</url>
+    </snapshotRepository>
   </distributionManagement>
 </project>
