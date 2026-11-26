@@ -99,7 +99,7 @@
     <maven.eclipse.plugin.version>2.10</maven.eclipse.plugin.version>
     <maven.exec.plugin.version>3.1.0</maven.exec.plugin.version>
     <maven.versions.plugin.version>2.16.0</maven.versions.plugin.version>
-    <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
+    <maven.shade.plugin.version>3.6.1</maven.shade.plugin.version>
     <maven.surefire.plugin.version>3.5.1</maven.surefire.plugin.version>
     <maven.cyclonedx.plugin.version>2.7.10</maven.cyclonedx.plugin.version>
     <maven.license.plugin.version>2.3.0</maven.license.plugin.version>
@@ -112,7 +112,7 @@
     <apache-directory-server.version>2.0.0-M24</apache-directory-server.version>
     <avatica.version>1.23.0</avatica.version>
     <avro.version>1.12.0</avro.version>
-    <bcprov-jdk18on.version>1.80.2</bcprov-jdk18on.version>
+    <bcprov-jdk18on.version>1.85</bcprov-jdk18on.version>
     <calcite.version>1.33.0</calcite.version>
     <datanucleus-api-jdo.version>6.0.3</datanucleus-api-jdo.version>
     <datanucleus-core.version>6.0.10</datanucleus-core.version>
@@ -153,7 +153,7 @@
     <httpcomponents.core.version>4.4.13</httpcomponents.core.version>
     <immutables.version>2.9.2</immutables.version>
     <ivy.version>2.5.2</ivy.version>
-    <jackson.version>2.21.5</jackson.version>
+    <jackson.version>2.21.8</jackson.version>
     <jamon.plugin.version>2.3.4</jamon.plugin.version>
     <jamon-runtime.version>2.4.1</jamon-runtime.version>
     <javax-servlet.version>3.1.0</javax-servlet.version>
